@@ -1,0 +1,165 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Upload video — Alluora Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.2.3/dist/tus.min.js"></script>
+{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <a href="{% url 'dashboard:videos' %}" class="text-sm text-stone-500 hover:text-stone-700">← Videos</a>
+  <h1 class="font-display text-3xl text-stone-900 mt-2">Upload a video</h1>
+  <p class="text-sm text-stone-500 mt-1">Direct upload to Bunny Stream over TUS (resumable). The browser uploads straight to Bunny's edge — Django only mints the signature.</p>
+</div>
+
+<div class="bg-white rounded-xl border border-stone-200 p-6 max-w-2xl"
+     x-data="videoUploader()" x-init="init()">
+
+  <!-- Step 1: metadata -->
+  <div x-show="step === 'metadata'" class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Title</label>
+      <input type="text" x-model="title" class="form-input" placeholder="e.g. How to apply Alluora Renewal Serum">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Description</label>
+      <textarea x-model="description" rows="3" class="form-input"></textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Collection</label>
+      <select x-model="collectionId" class="form-input">
+        <option value="">— None —</option>
+        {% for c in collections %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Video file</label>
+      <input type="file" accept="video/*" @change="file = $event.target.files[0]" class="form-input">
+      <p class="text-xs text-stone-500 mt-1">MP4 / MOV / WebM. Up to a few GB. Resumes if your connection drops.</p>
+    </div>
+    <button @click="startUpload()" :disabled="!file || !title.trim()"
+            class="btn btn-primary"
+            :class="{'opacity-50 cursor-not-allowed': !file || !title.trim()}">
+      Start upload →
+    </button>
+  </div>
+
+  <!-- Step 2: upload progress -->
+  <div x-show="step === 'uploading'" class="space-y-4">
+    <p class="text-sm text-stone-700">Uploading <strong x-text="file?.name"></strong> to Bunny…</p>
+    <div class="w-full bg-stone-100 rounded-full h-3 overflow-hidden">
+      <div class="bg-brand-500 h-full transition-all" :style="`width: ${progress}%`"></div>
+    </div>
+    <p class="text-xs text-stone-500"><span x-text="progress"></span>% — <span x-text="speed"></span></p>
+  </div>
+
+  <!-- Step 3: processing -->
+  <div x-show="step === 'processing'" class="space-y-4">
+    <div class="flex items-center gap-3">
+      <svg class="animate-spin w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+      </svg>
+      <p class="text-sm text-stone-700">Bunny is transcoding the video…</p>
+    </div>
+    <p class="text-xs text-stone-500">This usually takes about as long as the video duration. You can leave this page; the status will update next time you visit Videos.</p>
+    <a :href="`/dashboard/videos/${videoId}/`" class="btn btn-primary">Edit metadata →</a>
+  </div>
+
+  <!-- Error -->
+  <div x-show="error" class="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-800" x-text="error"></div>
+</div>
+
+<script>
+function videoUploader() {
+  return {
+    step: 'metadata',
+    title: '',
+    description: '',
+    collectionId: '',
+    file: null,
+    videoId: null,
+    progress: 0,
+    speed: '',
+    error: null,
+    csrf: document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}',
+
+    init() {
+      // Pull CSRF from the cookie since this template doesn't have a form.
+      const m = document.cookie.match(/csrftoken=([^;]+)/);
+      if (m) this.csrf = m[1];
+    },
+
+    async startUpload() {
+      this.error = null;
+      this.step = 'uploading';
+      try {
+        // 1. Create the video object on Django/Bunny.
+        const createResp = await fetch('/api/v1/videos/admin/create/', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': this.csrf,
+          },
+          body: JSON.stringify({
+            title: this.title,
+            description: this.description,
+            collection_id: this.collectionId ? parseInt(this.collectionId, 10) : null,
+          }),
+        });
+        if (!createResp.ok) throw new Error('Could not create video record (' + createResp.status + ').');
+        const video = await createResp.json();
+        this.videoId = video.id;
+
+        // 2. Get TUS upload signature.
+        const presignResp = await fetch(`/api/v1/videos/admin/${video.id}/presign/`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'X-CSRFToken': this.csrf },
+        });
+        if (!presignResp.ok) throw new Error('Could not get upload signature.');
+        const presign = await presignResp.json();
+
+        // 3. Start the TUS upload.
+        const upload = new tus.Upload(this.file, {
+          endpoint: presign.tus_endpoint,
+          retryDelays: [0, 3000, 5000, 10000, 20000, 60000],
+          headers: {
+            AuthorizationSignature: presign.authorization_signature,
+            AuthorizationExpire: presign.authorization_expire,
+            VideoId: presign.video_id,
+            LibraryId: presign.library_id,
+          },
+          metadata: {
+            filetype: this.file.type,
+            title: this.title,
+          },
+          onError: (err) => {
+            this.error = 'Upload failed: ' + err.message;
+            this.step = 'metadata';
+          },
+          onProgress: (uploaded, total) => {
+            this.progress = Math.round((uploaded / total) * 100);
+            this.speed = `${(uploaded / 1024 / 1024).toFixed(1)} / ${(total / 1024 / 1024).toFixed(1)} MB`;
+          },
+          onSuccess: () => {
+            this.step = 'processing';
+            // Kick off a status sync so Bunny's metadata flows back to us.
+            fetch(`/api/v1/videos/admin/${video.id}/sync/`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'X-CSRFToken': this.csrf },
+            });
+          },
+        });
+        upload.start();
+      } catch (e) {
+        this.error = e.message;
+        this.step = 'metadata';
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

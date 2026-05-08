@@ -1,0 +1,28 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Settings — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <h1 class="font-display text-3xl text-stone-900">Settings</h1>
+  <p class="text-sm text-stone-500 mt-1">Read-only view of the current Railway environment configuration. Edit values in your Railway project settings, then redeploy.</p>
+</div>
+
+<div class="bg-white rounded-xl border border-stone-200 overflow-hidden max-w-3xl">
+  <table class="w-full text-sm">
+    <tbody class="divide-y divide-stone-100">
+      {% for key, val in env.items %}
+      <tr>
+        <th class="text-left px-5 py-3 font-medium text-stone-700 w-2/5">{{ key }}</th>
+        <td class="px-5 py-3 text-stone-600 font-mono text-xs">{{ val }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-6 bg-white rounded-xl border border-stone-200 p-5 max-w-3xl">
+  <h2 class="font-medium text-stone-900 mb-3">API documentation</h2>
+  <p class="text-sm text-stone-600">Browse the live API schema:</p>
+  <a href="/api/docs/" target="_blank" class="btn btn-ghost mt-2">Open Swagger UI →</a>
+</div>
+{% endblock %}

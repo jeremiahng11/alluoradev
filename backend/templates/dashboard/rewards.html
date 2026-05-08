@@ -1,0 +1,75 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Rewards — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <h1 class="font-display text-3xl text-stone-900">Rewards ledger</h1>
+  <p class="text-sm text-stone-500 mt-1">Append-only points history. Adjustments are immutable.</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <div class="text-xs uppercase tracking-wider text-stone-500">Total issued</div>
+    <div class="font-display text-3xl text-brand-600 mt-2">{{ total_issued }}</div>
+  </div>
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <div class="text-xs uppercase tracking-wider text-stone-500">Total redeemed</div>
+    <div class="font-display text-3xl text-stone-700 mt-2">{{ total_redeemed }}</div>
+  </div>
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <div class="text-xs uppercase tracking-wider text-stone-500">Outstanding</div>
+    <div class="font-display text-3xl text-stone-900 mt-2">{{ total_issued|add:total_redeemed|stringformat:"d" }}</div>
+  </div>
+</div>
+
+<!-- Manual grant form -->
+<details class="mb-6 bg-white rounded-xl border border-stone-200 p-5" x-data>
+  <summary class="cursor-pointer font-medium text-stone-900">Manually adjust points</summary>
+  <form method="post" action="{% url 'dashboard:rewards-grant' %}" class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+    {% csrf_token %}
+    <input type="email" name="user_email" placeholder="user@example.com" required class="form-input md:col-span-2">
+    <input type="number" name="points" placeholder="Points (use - to deduct)" required class="form-input">
+    <input type="text" name="description" placeholder="Reason" required class="form-input md:col-span-3">
+    <button type="submit" class="btn btn-primary">Apply</button>
+  </form>
+</details>
+
+<div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+      <tr>
+        <th class="text-left px-5 py-3">When</th>
+        <th class="text-left px-5 py-3">User</th>
+        <th class="text-left px-5 py-3">Points</th>
+        <th class="text-left px-5 py-3">Source</th>
+        <th class="text-left px-5 py-3">Description</th>
+        <th class="text-left px-5 py-3">By</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for e in entries %}
+      <tr>
+        <td class="px-5 py-3 text-stone-500">{{ e.created_at|date:"M j, H:i" }}</td>
+        <td class="px-5 py-3"><a href="{% url 'dashboard:user-detail' e.user.id %}" class="text-stone-900 hover:text-brand-600">{{ e.user.email }}</a></td>
+        <td class="px-5 py-3 font-medium {% if e.points > 0 %}text-green-700{% else %}text-red-700{% endif %}">{{ e.points|stringformat:"+d" }}</td>
+        <td class="px-5 py-3"><span class="pill bg-stone-100 text-stone-600">{{ e.get_source_display }}</span></td>
+        <td class="px-5 py-3 text-stone-600">{{ e.description|default:"—" }}</td>
+        <td class="px-5 py-3 text-stone-500 text-xs">{{ e.created_by.email|default:"system" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="px-5 py-12 text-center text-stone-500">No reward activity yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+<div class="mt-4 flex items-center justify-between text-sm">
+  <span class="text-stone-500">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}" class="btn btn-ghost">← Prev</a>{% endif %}
+    {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}" class="btn btn-ghost">Next →</a>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

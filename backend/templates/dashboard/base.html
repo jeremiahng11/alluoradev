@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Alluora Dashboard{% endblock %}</title>
+
+  <!-- Tailwind via CDN — fine for small admin dashboards. For larger ones,
+       compile via npm; the CDN is rate-limited and not recommended for prod
+       customer pages. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#FBF1EA',
+              100: '#F3D8C4',
+              200: '#EBB89A',
+              300: '#E0976F',
+              400: '#D87850',
+              500: '#DD5430',
+              600: '#C44525',
+              700: '#9C361D',
+              800: '#732817',
+              900: '#4F1B0F',
+            },
+            cream: '#FAF3E8',
+          },
+          fontFamily: {
+            display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Alpine.js for the small interactive bits -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+
+  <!-- HTMX — used for inline editing where it makes sense -->
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; background: #FAF7F1; color: #1F1A14; }
+    .form-input {
+      width: 100%; padding: .65rem .9rem; border-radius: .5rem;
+      border: 1px solid #d6d3d1; background: white;
+      transition: border-color .15s, box-shadow .15s; outline: none;
+    }
+    .form-input:focus { border-color: #DD5430; box-shadow: 0 0 0 3px rgba(221,84,48,.15); }
+    .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .55rem 1rem; border-radius: .5rem; font-weight: 500; transition: all .15s; }
+    .btn-primary { background: #DD5430; color: white; }
+    .btn-primary:hover { background: #C44525; }
+    .btn-ghost { color: #57534e; }
+    .btn-ghost:hover { background: #f5f5f4; }
+    .btn-danger { background: #DC2626; color: white; }
+    .btn-danger:hover { background: #B91C1C; }
+    .pill { display: inline-flex; padding: .15rem .65rem; border-radius: 9999px; font-size: .75rem; font-weight: 500; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen">
+{% block content %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,62 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}{{ app_user.email }} — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <a href="{% url 'dashboard:users' %}" class="text-sm text-stone-500 hover:text-stone-700">← Users</a>
+  <h1 class="font-display text-3xl text-stone-900 mt-2">{{ app_user.display_name_or_email }}</h1>
+  <p class="text-sm text-stone-500">{{ app_user.email }}</p>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-6">
+  <!-- Profile -->
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <h2 class="font-medium text-stone-900 mb-4">Profile</h2>
+    <dl class="text-sm space-y-2">
+      <div class="flex justify-between"><dt class="text-stone-500">First name</dt><dd>{{ app_user.first_name|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Last name</dt><dd>{{ app_user.last_name|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Phone</dt><dd>{{ app_user.phone|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">WP user ID</dt><dd class="font-mono">{{ app_user.wp_user_id|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Joined</dt><dd>{{ app_user.date_joined|date:"M j, Y" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Last synced</dt><dd>{% if app_user.last_synced_at %}{{ app_user.last_synced_at|timesince }} ago{% else %}—{% endif %}</dd></div>
+    </dl>
+  </div>
+
+  <!-- Rewards -->
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <h2 class="font-medium text-stone-900 mb-4">Rewards</h2>
+    <div class="font-display text-4xl text-brand-600">{{ balance }}</div>
+    <p class="text-xs text-stone-500 mb-4">points balance</p>
+    <ul class="text-sm space-y-2 max-h-64 overflow-y-auto">
+      {% for entry in ledger %}
+      <li class="flex justify-between border-b border-stone-100 pb-1">
+        <span class="text-stone-700 truncate">{{ entry.description|default:entry.get_source_display }}</span>
+        <span class="font-medium {% if entry.points > 0 %}text-green-700{% else %}text-red-700{% endif %}">{{ entry.points|stringformat:"+d" }}</span>
+      </li>
+      {% empty %}
+      <li class="text-stone-400 text-sm">No history</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- Quiz history -->
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <h2 class="font-medium text-stone-900 mb-4">Quiz history</h2>
+    <ul class="text-sm space-y-3">
+      {% for sub in submissions %}
+      <li>
+        <div class="flex justify-between">
+          <span class="text-stone-700">{{ sub.quiz.name }}</span>
+          <span class="text-xs text-stone-500">{{ sub.submitted_at|date:"M j" }}</span>
+        </div>
+        {% if sub.primary_result %}
+          <span class="pill bg-brand-50 text-brand-700">{{ sub.primary_result.name }}</span>
+        {% endif %}
+      </li>
+      {% empty %}
+      <li class="text-stone-400 text-sm">No quiz submissions yet</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}
