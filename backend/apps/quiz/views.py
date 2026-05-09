@@ -4,10 +4,19 @@
   POST /api/v1/quiz/{slug}/submit/         submit answers, get result type back
   GET /api/v1/quiz/submissions/            user's past submissions
 """
+import logging
 from collections import defaultdict
+
+from django.conf import settings as dj_settings
 from rest_framework import serializers, generics, permissions, status
 from rest_framework.response import Response
+
+from apps.rewards import wp_client
+from apps.rewards.models import RewardLedger
+
 from .models import Quiz, Question, Option, ResultType, Submission
+
+logger = logging.getLogger(__name__)
 
 
 class OptionSerializer(serializers.ModelSerializer):
@@ -120,6 +129,33 @@ class QuizSubmitView(generics.GenericAPIView):
             score_breakdown=dict(scores),
         )
         submission.selected_options.set(options)
+
+        # Award points for a successful submission. WP is the canonical
+        # points store, so we push the earn there first; on success we also
+        # record it in our local ledger for audit. If the bridge is down we
+        # still return the submission — earning is best-effort.
+        award_amount = int(getattr(dj_settings, 'QUIZ_PASS_POINTS', 0))
+        if award_amount > 0 and primary_result and request.user.wp_user_id:
+            ref = f'quiz_submission_{submission.id}'
+            try:
+                wp_client.award_points(
+                    wp_user_id=request.user.wp_user_id,
+                    delta=award_amount,
+                    source='quiz',
+                    reference_id=ref,
+                )
+                RewardLedger.objects.create(
+                    user=request.user,
+                    points=award_amount,
+                    source=RewardLedger.SOURCE_QUIZ,
+                    description=f'Completed: {quiz.name}',
+                    reference_id=ref,
+                )
+            except wp_client.BridgeError as exc:
+                logger.warning(
+                    'Failed to award quiz points (user=%s submission=%s): %s',
+                    request.user.pk, submission.id, exc,
+                )
 
         return Response(SubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
 

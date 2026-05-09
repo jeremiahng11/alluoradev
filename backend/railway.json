@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "bash start.sh",
+    "startCommand": "./start.sh",
     "healthcheckPath": "/dashboard/login/",
     "healthcheckTimeout": 30,
     "restartPolicyType": "ON_FAILURE",

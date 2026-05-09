@@ -153,6 +153,20 @@ BOOTSTRAP_ADMIN_USERNAME = config('BOOTSTRAP_ADMIN_USERNAME', default='admin')
 WORDPRESS_BASE_URL = config('WORDPRESS_BASE_URL', default='https://staging.alluora.com')
 WORDPRESS_API_NAMESPACE = 'alluora/v1'
 
+# HMAC shared secret for service-to-service /sync/* calls into the bridge
+# plugin (read points, award points). Must match the "Bridge shared secret"
+# field on the WP plugin admin page. Empty string = sync disabled.
+ALLUORA_BRIDGE_SECRET = config('ALLUORA_BRIDGE_SECRET', default='')
+
+# Cache TTL for the WP→Django points read mirror. Short enough that admin
+# adjustments on WP show up quickly; long enough to avoid hammering WP on
+# every API call from the app.
+ALLUORA_POINTS_CACHE_TTL = int(config('ALLUORA_POINTS_CACHE_TTL', default=45))
+
+# Points granted on a successful quiz submission (a submission that matched
+# a result type). Set to 0 to disable quiz earning.
+QUIZ_PASS_POINTS = int(config('QUIZ_PASS_POINTS', default=50))
+
 # ---------------------------------------------------------------------------
 # Bunny.net Stream
 # ---------------------------------------------------------------------------

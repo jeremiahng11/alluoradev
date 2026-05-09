@@ -5,4 +5,4 @@ nixPkgs = ["python312"]
 cmds = ["python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt"]
 
 [start]
-cmd = "bash start.sh"
+cmd = "./start.sh"

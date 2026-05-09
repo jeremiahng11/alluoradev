@@ -22,8 +22,17 @@ class AppUserSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_reward_points(self, obj):
-        # Avoid circular import.
+        # Mirror from WordPress (canonical points store). Falls back to the
+        # local ledger if the bridge is unreachable so /accounts/me still
+        # returns *something* rather than failing the whole user payload.
+        from apps.rewards import wp_client
         from apps.rewards.models import RewardLedger
+        if obj.wp_user_id:
+            try:
+                summary = wp_client.get_user_summary(obj.wp_user_id)
+                return int(summary.get('total_points') or 0)
+            except wp_client.BridgeError:
+                pass
         return RewardLedger.balance_for(obj)
 
 
