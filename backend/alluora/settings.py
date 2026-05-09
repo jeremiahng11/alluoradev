@@ -274,3 +274,5 @@ LOGGING = {
         'apps': {'handlers': ['console'], 'level': 'INFO'},
     },
 }
+
+# Deploy bump: force Railway to rebuild from HEAD (no behaviour change)
