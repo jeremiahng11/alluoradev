@@ -1,0 +1,105 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Skin AI results — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="flex items-end justify-between mb-6">
+  <div>
+    <h1 class="font-display text-3xl text-stone-900">Skin AI results</h1>
+    <p class="text-sm text-stone-500 mt-1">
+      Every member who has ever run a scan. Click through to delete
+      individual scans, clear selected ones, or wipe a user's entire
+      Skin AI history. All deletes are permanent and remove the row
+      from the user's in-app history too.
+    </p>
+  </div>
+  <div class="text-sm text-stone-500">
+    <span class="font-display text-2xl text-stone-900">{{ total_visible }}</span>
+    scans
+  </div>
+</div>
+
+<form method="get" class="mb-4">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by name or email…"
+         class="form-input w-full max-w-md">
+</form>
+
+<div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+      <tr>
+        <th class="text-left px-5 py-3">Member</th>
+        <th class="text-left px-5 py-3">Latest</th>
+        <th class="text-left px-5 py-3">Latest score</th>
+        <th class="text-right px-5 py-3">Scans</th>
+        <th class="px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for u in users %}
+      {% with latest=latest_by_user|default_if_none:''|stringformat:'s' %}{% endwith %}
+      <tr class="hover:bg-stone-50/50">
+        <td class="px-5 py-3">
+          <a href="{% url 'dashboard:skin-ai-user-detail' u.id %}"
+             class="font-medium text-stone-900 hover:text-brand-600">
+            {{ u.email }}
+          </a>
+          {% if u.first_name or u.last_name %}
+            <div class="text-xs text-stone-500 mt-0.5">
+              {{ u.first_name }} {{ u.last_name }}
+            </div>
+          {% endif %}
+        </td>
+        <td class="px-5 py-3 text-stone-600">
+          {% with last=u.skin_analyses.last %}{% endwith %}
+          {# Pull latest via the prebuilt map to avoid extra queries. #}
+          {% with latest_scan=u.id %}{% endwith %}
+          {% with row=u.id|stringformat:'s' %}{% endwith %}
+          {% with last_scan=u.id %}
+            {% for k, v in latest_by_user.items %}
+              {% if k == u.id %}{{ v.created_at|date:"d M Y" }}{% endif %}
+            {% endfor %}
+          {% endwith %}
+        </td>
+        <td class="px-5 py-3 text-stone-700">
+          {% for k, v in latest_by_user.items %}
+            {% if k == u.id %}
+              <span class="font-medium">{{ v.overall_score }}/100</span>
+              {% if v.skin_age %}
+                <span class="text-xs text-stone-500 ml-2">age {{ v.skin_age }}</span>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        </td>
+        <td class="px-5 py-3 text-right text-stone-700 tabular-nums">
+          {{ u.scan_count }}
+        </td>
+        <td class="px-5 py-3 text-right">
+          <a href="{% url 'dashboard:skin-ai-user-detail' u.id %}"
+             class="btn btn-ghost text-xs">View →</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="px-5 py-10 text-center text-stone-500">
+        No scans yet.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+<div class="mt-4 flex items-center justify-between text-sm text-stone-600">
+  <div>Page {{ page_obj.number }} of {{ paginator.num_pages }}</div>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}"
+         class="btn btn-ghost text-xs">← Prev</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}"
+         class="btn btn-ghost text-xs">Next →</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

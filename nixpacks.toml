@@ -1,0 +1,10 @@
+[phases.setup]
+nixPkgs = ["python312"]
+# No apt deps needed — Skin AI pipeline runs on pure Python (Pillow +
+# numpy + DeepFace/TF) with no native C deps beyond what TF bundles.
+
+[phases.install]
+cmds = ["python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt"]
+
+[start]
+cmd = "./start.sh"

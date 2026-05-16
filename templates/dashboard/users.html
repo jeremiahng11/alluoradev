@@ -1,0 +1,106 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Users — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <h1 class="font-display text-3xl text-stone-900">App users</h1>
+  <p class="text-sm text-stone-500 mt-1">Mirrored from WordPress on first contact. Source of truth for accounts is WordPress.</p>
+</div>
+
+<!-- Tier filter chips — click to filter, including an "All" pill. -->
+<div class="flex flex-wrap gap-2 mb-3">
+  <a href="?{% if q %}q={{ q }}{% endif %}"
+     class="px-3 py-1.5 rounded-full text-xs font-medium border {% if not active_tier %}bg-stone-900 text-white border-stone-900{% else %}bg-white text-stone-700 border-stone-200 hover:border-stone-400{% endif %}">
+    All <span class="opacity-60 ml-1">{{ total_count }}</span>
+  </a>
+  {% for t in tier_counts %}
+    <a href="?tier={{ t.value }}{% if q %}&q={{ q }}{% endif %}"
+       class="px-3 py-1.5 rounded-full text-xs font-medium border inline-flex items-center gap-1.5 {% if active_tier == t.value %}bg-stone-900 text-white border-stone-900{% else %}bg-white text-stone-700 border-stone-200 hover:border-stone-400{% endif %}">
+      <span class="inline-block w-2 h-2 rounded-full
+        {% if t.value == 'Silver' %}bg-stone-400
+        {% elif t.value == 'Gold' %}bg-amber-400
+        {% elif t.value == 'Platinum' %}bg-slate-400
+        {% elif t.value == 'Titanium' %}bg-stone-700
+        {% endif %}"></span>
+      {{ t.label }} <span class="opacity-60 ml-0.5">{{ t.count }}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<form method="get" class="mb-4 flex gap-2 items-center">
+  {% if active_tier %}<input type="hidden" name="tier" value="{{ active_tier }}">{% endif %}
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by email or name…" class="form-input max-w-sm">
+  {% if q or active_tier %}
+    <a href="{% url 'dashboard:users' %}" class="btn btn-ghost text-xs">Clear filters</a>
+  {% endif %}
+</form>
+
+<div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+      <tr>
+        <th class="text-left px-5 py-3">Email</th>
+        <th class="text-left px-5 py-3">
+          {% if active_sort == 'name' %}
+            <a href="?sort=-name{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Name ↑</a>
+          {% elif active_sort == '-name' %}
+            <a href="?sort=name{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Name ↓</a>
+          {% else %}
+            <a href="?sort=name{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Name</a>
+          {% endif %}
+        </th>
+        <th class="text-left px-5 py-3">
+          {% if active_sort == 'tier' %}
+            <a href="?sort=-tier{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Tier ↑</a>
+          {% elif active_sort == '-tier' %}
+            <a href="?sort=tier{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Tier ↓</a>
+          {% else %}
+            <a href="?sort=tier{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Tier</a>
+          {% endif %}
+        </th>
+        <th class="text-left px-5 py-3">
+          {% if active_sort == 'glow' %}
+            <a href="?sort=-glow{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Glow coins ↑</a>
+          {% elif active_sort == '-glow' %}
+            <a href="?sort=glow{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Glow coins ↓</a>
+          {% else %}
+            <a href="?sort=-glow{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}" class="hover:text-stone-700">Glow coins</a>
+          {% endif %}
+        </th>
+        <th class="text-left px-5 py-3">Membership</th>
+        <th class="text-left px-5 py-3">WP ID</th>
+        <th class="text-left px-5 py-3">Joined</th>
+        <th class="text-left px-5 py-3">Last synced</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for u in users %}
+      <tr>
+        <td class="px-5 py-3"><a href="{% url 'dashboard:user-detail' u.id %}" class="font-medium text-stone-900 hover:text-brand-600">{{ u.email }}</a></td>
+        <td class="px-5 py-3 text-stone-700">{{ u.first_name }} {{ u.last_name }}</td>
+        <td class="px-5 py-3 text-stone-700">{{ u.tier|default:"—" }}</td>
+        <td class="px-5 py-3 text-stone-700 font-medium">
+          {% if u.glow_coins is not None %}{{ u.glow_coins }}{% else %}—{% endif %}
+        </td>
+        <td class="px-5 py-3 text-stone-500 font-mono text-xs">{% if u.membership_number %}{{ u.membership_number|slice:":4" }} {{ u.membership_number|slice:"4:8" }} {{ u.membership_number|slice:"8:12" }}{% else %}—{% endif %}</td>
+        <td class="px-5 py-3 text-stone-500 font-mono text-xs">{{ u.wp_user_id|default:"—" }}</td>
+        <td class="px-5 py-3 text-stone-500">{{ u.date_joined|date:"M j, Y" }}</td>
+        <td class="px-5 py-3 text-stone-500">{% if u.last_synced_at %}{{ u.last_synced_at|timesince }} ago{% else %}—{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="px-5 py-12 text-center text-stone-500">No app users yet. They appear here after first login from the mobile app.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+<div class="mt-4 flex items-center justify-between text-sm">
+  <span class="text-stone-500">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}{% if active_sort and active_sort != 'recent' %}&sort={{ active_sort }}{% endif %}" class="btn btn-ghost">← Prev</a>{% endif %}
+    {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if active_tier %}&tier={{ active_tier }}{% endif %}{% if active_sort and active_sort != 'recent' %}&sort={{ active_sort }}{% endif %}" class="btn btn-ghost">Next →</a>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

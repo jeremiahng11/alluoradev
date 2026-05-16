@@ -1,0 +1,170 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Edit video — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <a href="{% url 'dashboard:videos' %}" class="text-sm text-stone-500 hover:text-stone-700">← Videos</a>
+  <h1 class="font-display text-3xl text-stone-900 mt-2">{{ object.title }}</h1>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6 max-w-5xl">
+  <!-- Preview -->
+  <div class="space-y-3">
+    {% if object.status == 'ready' and object.bunny_video_guid and bunny_library_id %}
+    <div class="aspect-video bg-stone-900 rounded-xl overflow-hidden">
+      <iframe
+        src="https://iframe.mediadelivery.net/embed/{{ bunny_library_id }}/{{ object.bunny_video_guid }}?autoplay=false"
+        loading="lazy"
+        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+        allowfullscreen
+        class="w-full h-full" frameborder="0"></iframe>
+    </div>
+    {% elif object.status == 'ready' %}
+    <div class="aspect-video bg-stone-100 rounded-xl flex items-center justify-center text-stone-500 text-sm text-center px-6">
+      Video is ready on Bunny but the dashboard can't build a player URL.
+      Check that <code>BUNNY_STREAM_LIBRARY_ID</code> is set on the Django service in Railway.
+    </div>
+    {% else %}
+    <div class="aspect-video bg-stone-100 rounded-xl flex items-center justify-center text-stone-500 text-sm">
+      Status: {{ object.get_status_display }}
+    </div>
+    {% endif %}
+
+    <dl class="bg-white rounded-xl border border-stone-200 p-5 text-sm space-y-2">
+      <div class="flex justify-between"><dt class="text-stone-500">Bunny GUID</dt><dd class="font-mono text-xs">{{ object.bunny_video_guid }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Status</dt><dd>{{ object.get_status_display }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Duration</dt><dd>{{ object.duration_seconds|default:"—" }}s</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Resolution</dt><dd>{% if object.width %}{{ object.width }}×{{ object.height }}{% else %}—{% endif %}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Views</dt><dd>{{ view_count }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Likes</dt><dd>{{ like_count }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Comments</dt><dd>{{ comment_count }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">HLS URL</dt><dd class="text-xs truncate ml-4">{{ object.hls_url }}</dd></div>
+    </dl>
+
+    <!-- Article-embed snippet -->
+    <div class="bg-white rounded-xl border border-stone-200 p-5 space-y-3" x-data="{ copied: false }">
+      <div>
+        <h3 class="font-medium text-stone-900">Embed in an article</h3>
+        <p class="text-xs text-stone-500 mt-1">
+          Copy this snippet and paste it into any article body to inline a clickable video link.
+          The Flutter app turns <code class="text-xs">alluora://video/&lt;id&gt;</code> URLs
+          into a tap-to-play card at that position.
+        </p>
+      </div>
+      <div class="flex gap-2">
+        <input
+          type="text"
+          readonly
+          id="video-embed-snippet"
+          value="[▶︎ {{ object.title|escapejs }}](alluora://video/{{ object.id }})"
+          class="form-input font-mono text-xs flex-1"
+          onclick="this.select()"
+        >
+        <button type="button"
+                @click="navigator.clipboard.writeText(document.getElementById('video-embed-snippet').value); copied = true; setTimeout(() => copied = false, 1500);"
+                class="btn btn-primary text-xs whitespace-nowrap">
+          <span x-show="!copied">Copy</span>
+          <span x-show="copied">Copied ✓</span>
+        </button>
+      </div>
+      <p class="text-[11px] text-stone-400">
+        Renders as a Markdown link if the article view falls back to plain Markdown.
+      </p>
+    </div>
+
+    <form method="post" action="{% url 'dashboard:video-delete' object.id %}" onsubmit="return confirm('Delete this video from Bunny? This cannot be undone.')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost text-red-600 hover:bg-red-50">Delete video</button>
+    </form>
+  </div>
+
+  <!-- Metadata form -->
+  <form method="post" class="bg-white rounded-xl border border-stone-200 p-6 space-y-5 h-fit">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Title</label>
+      {{ form.title }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Description</label>
+      {{ form.description }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Collection</label>
+      {{ form.collection }}
+      <p class="text-xs text-stone-500 mt-1">Optional themed grouping. Manage at <a href="{% url 'dashboard:collections' %}" class="underline">Collections</a>.</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Minimum tier to watch</label>
+      {{ form.min_tier }}
+      <p class="text-xs text-stone-500 mt-1">"Public" = guests + everyone. Higher tiers stack — Gold members also see Silver and Public videos, etc.</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Schedule publish</label>
+      {{ form.publish_at }}
+      <p class="text-xs text-stone-500 mt-1">Leave blank to publish immediately when "Publish to the app" is on. Set a future date/time to schedule — the video stays hidden until then and auto-appears in the app.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.is_featured }}
+      <label class="text-sm text-stone-700">Feature this video</label>
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.is_published }}
+      <label class="text-sm text-stone-700">Publish to the app</label>
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.comments_enabled }}
+      <label class="text-sm text-stone-700">Allow comments on this video</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Save changes</button>
+  </form>
+</div>
+
+<!-- Comment moderation -->
+<div class="max-w-5xl mt-8">
+  <div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
+      <div>
+        <h2 class="font-display text-lg text-stone-900">Comments</h2>
+        <p class="text-xs text-stone-500 mt-1">
+          {{ comment_count }} total · {{ like_count }} like{{ like_count|pluralize }}
+          {% if not object.comments_enabled %}
+            · <span class="text-amber-700">Posting disabled</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    {% if comments %}
+    <ul class="divide-y divide-stone-100">
+      {% for c in comments %}
+      <li class="px-5 py-4 flex items-start gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 text-sm">
+            <span class="font-medium text-stone-900">
+              {{ c.user.first_name|default:c.user.username|default:c.user.email }}
+              {% if not c.user.first_name and c.user.last_name %}{{ c.user.last_name }}{% endif %}
+            </span>
+            <span class="text-xs text-stone-400">{{ c.created_at|date:"M j, Y · H:i" }}</span>
+          </div>
+          <p class="text-sm text-stone-700 mt-1 whitespace-pre-wrap">{{ c.body }}</p>
+        </div>
+        <form method="post"
+              action="{% url 'dashboard:video-comment-delete' object.id c.id %}"
+              onsubmit="return confirm('Delete this comment? It will be removed for everyone.');">
+          {% csrf_token %}
+          <button type="submit"
+                  class="btn btn-ghost text-xs text-red-600 hover:bg-red-50">
+            Delete
+          </button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="px-5 py-10 text-center text-stone-500 text-sm">
+      No comments yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

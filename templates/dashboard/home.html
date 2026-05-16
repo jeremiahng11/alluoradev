@@ -1,0 +1,79 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Overview — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-8">
+  <h1 class="font-display text-4xl text-stone-900">Welcome back.</h1>
+  <p class="text-stone-500 mt-1">Here's what's happening with the Alluora app.</p>
+</div>
+
+{% if not bunny_configured %}
+<div class="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+  <strong>Bunny Stream isn't configured.</strong> Set <code>BUNNY_STREAM_API_KEY</code> and <code>BUNNY_STREAM_LIBRARY_ID</code> in Railway env vars to enable video uploads.
+</div>
+{% endif %}
+
+<!-- KPI tiles -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <div class="text-xs uppercase tracking-wider text-stone-500">Articles</div>
+    <div class="font-display text-3xl text-stone-900 mt-2">{{ article_count }}</div>
+    <div class="text-xs text-stone-500 mt-1">{{ published_articles }} published</div>
+  </div>
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <div class="text-xs uppercase tracking-wider text-stone-500">Videos</div>
+    <div class="font-display text-3xl text-stone-900 mt-2">{{ video_count }}</div>
+    <div class="text-xs text-stone-500 mt-1">{{ video_ready_count }} ready to play</div>
+  </div>
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <div class="text-xs uppercase tracking-wider text-stone-500">App users</div>
+    <div class="font-display text-3xl text-stone-900 mt-2">{{ user_count }}</div>
+    <div class="text-xs text-stone-500 mt-1">Mirrored from WordPress</div>
+  </div>
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <div class="text-xs uppercase tracking-wider text-stone-500">Points issued</div>
+    <div class="font-display text-3xl text-brand-600 mt-2">{{ points_issued }}</div>
+    <div class="text-xs text-stone-500 mt-1">All-time earned</div>
+  </div>
+</div>
+
+<!-- Recent quiz activity -->
+<div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+  <div class="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
+    <h2 class="font-medium text-stone-900">Recent quiz submissions</h2>
+    <a href="{% url 'dashboard:users' %}" class="text-xs text-brand-600 hover:text-brand-700">View all users →</a>
+  </div>
+  {% if recent_submissions %}
+  <table class="w-full text-sm">
+    <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+      <tr>
+        <th class="text-left px-5 py-3">User</th>
+        <th class="text-left px-5 py-3">Quiz</th>
+        <th class="text-left px-5 py-3">Result</th>
+        <th class="text-left px-5 py-3">When</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for sub in recent_submissions %}
+      <tr>
+        <td class="px-5 py-3">{{ sub.user.email }}</td>
+        <td class="px-5 py-3">{{ sub.quiz.name }}</td>
+        <td class="px-5 py-3">
+          {% if sub.primary_result %}
+            <span class="pill bg-brand-50 text-brand-700">{{ sub.primary_result.name }}</span>
+          {% else %}
+            <span class="text-stone-400">—</span>
+          {% endif %}
+        </td>
+        <td class="px-5 py-3 text-stone-500">{{ sub.submitted_at|timesince }} ago</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="px-5 py-12 text-center text-sm text-stone-500">
+    No quiz submissions yet. Once users complete the skin quiz, they'll show up here.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

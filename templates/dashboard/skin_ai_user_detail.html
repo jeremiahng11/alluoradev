@@ -1,0 +1,123 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Skin AI scans — {{ app_user.email }}{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <a href="{% url 'dashboard:skin-ai-users' %}"
+     class="text-sm text-stone-500 hover:text-stone-700">← Skin AI results</a>
+  <h1 class="font-display text-3xl text-stone-900 mt-2">{{ app_user.email }}</h1>
+  <p class="text-sm text-stone-500 mt-1">
+    {{ app_user.first_name }} {{ app_user.last_name }} ·
+    Tier: <span class="text-stone-700 font-medium">{{ app_user.tier|default:"—" }}</span> ·
+    {{ scans|length }} scan{{ scans|length|pluralize }}
+    <span class="text-stone-400">(max 6 — oldest is dropped on each new scan)</span>
+  </p>
+</div>
+
+{% if messages %}
+  {% for m in messages %}
+  <div class="mb-4 rounded-md px-4 py-3 text-sm
+              {% if m.tags == 'success' %}bg-green-50 border border-green-200 text-green-800
+              {% elif m.tags == 'error' %}bg-red-50 border border-red-200 text-red-800
+              {% else %}bg-stone-50 border border-stone-200 text-stone-700{% endif %}">
+    {{ m }}
+  </div>
+  {% endfor %}
+{% endif %}
+
+{% if scans %}
+<form method="post"
+      action="{% url 'dashboard:skin-ai-user-bulk-delete' app_user.id %}"
+      x-data="{ selected: 0 }"
+      @change="selected = $el.querySelectorAll('input[name=scan_ids]:checked').length">
+  {% csrf_token %}
+
+  {# Sticky toolbar — bulk actions stay reachable while scrolling. #}
+  <div class="sticky top-0 z-10 -mx-8 px-8 py-3 mb-4 bg-stone-50/90 backdrop-blur border-b border-stone-200 flex items-center gap-3">
+    <label class="inline-flex items-center gap-2 text-sm text-stone-700">
+      <input type="checkbox"
+             @change="document.querySelectorAll('input[name=scan_ids]').forEach(cb => cb.checked = $event.target.checked); selected = $event.target.checked ? document.querySelectorAll('input[name=scan_ids]').length : 0">
+      Select all
+    </label>
+    <span class="text-xs text-stone-500" x-text="selected + ' selected'"></span>
+    <div class="ml-auto flex gap-2">
+      <button type="submit" name="action" value="delete-selected"
+              :disabled="selected === 0"
+              :class="selected === 0 ? 'opacity-40 cursor-not-allowed' : ''"
+              onclick="return confirm('Permanently delete the selected scans? This cannot be undone — the user will lose them too.')"
+              class="btn text-xs bg-red-600 text-white hover:bg-red-700">
+        Delete selected
+      </button>
+      <button type="submit" name="action" value="clear-all"
+              onclick="return confirm('Permanently delete ALL scans for this user? This cannot be undone — the user will lose them too.')"
+              class="btn btn-ghost text-xs text-red-600 hover:bg-red-50 border border-red-200">
+        Clear all scans
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for s in scans %}
+    <div class="bg-white rounded-xl border border-stone-200 p-4">
+      <div class="flex gap-4">
+        <label class="flex items-start pt-1">
+          <input type="checkbox" name="scan_ids" value="{{ s.id }}"
+                 class="w-4 h-4">
+        </label>
+        {% if s.thumbnail %}
+          <a href="{% url 'dashboard:skin-ai-analysis-detail' s.id %}">
+            <img src="/api/v1/skinai/{{ s.id }}/thumb/"
+                 class="w-20 h-20 rounded-lg object-cover border border-stone-200"
+                 alt="Skin scan thumbnail">
+          </a>
+        {% else %}
+          <div class="w-20 h-20 rounded-lg bg-stone-100 flex items-center justify-center text-stone-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          </div>
+        {% endif %}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-3">
+            <a href="{% url 'dashboard:skin-ai-analysis-detail' s.id %}"
+               class="font-display text-2xl text-stone-900 hover:text-brand-600">
+              {{ s.overall_score }}<span class="text-base text-stone-400">/100</span>
+            </a>
+            {% if s.skin_age %}
+              <span class="pill bg-stone-100 text-stone-700 text-xs">Age {{ s.skin_age }}</span>
+            {% endif %}
+          </div>
+          <div class="text-xs text-stone-500 mt-1">
+            {{ s.created_at|date:"d M Y, H:i" }}
+          </div>
+          {% if s.coin_cost > 0 %}
+            <div class="text-xs text-amber-700 mt-1">
+              Cost: {{ s.coin_cost }} Glow Coins
+            </div>
+          {% endif %}
+
+          <div class="grid grid-cols-5 gap-1 mt-3 text-[10px] uppercase tracking-wider text-stone-500">
+            <div>Hyd<div class="font-display text-sm text-stone-900 normal-case tracking-normal">{{ s.hydration_score }}</div></div>
+            <div>Pores<div class="font-display text-sm text-stone-900 normal-case tracking-normal">{{ s.pores_score }}</div></div>
+            <div>Wrnk<div class="font-display text-sm text-stone-900 normal-case tracking-normal">{{ s.wrinkles_score }}</div></div>
+            <div>Red<div class="font-display text-sm text-stone-900 normal-case tracking-normal">{{ s.redness_score }}</div></div>
+            <div>Spots<div class="font-display text-sm text-stone-900 normal-case tracking-normal">{{ s.spots_score }}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 flex items-center justify-between gap-2">
+        <a href="{% url 'dashboard:skin-ai-analysis-detail' s.id %}"
+           class="btn btn-ghost text-xs">View detail →</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</form>
+
+{# Alpine for the bulk-action toolbar interactivity. #}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% else %}
+<div class="py-10 text-center text-stone-500">
+  No scans for this member.
+</div>
+{% endif %}
+{% endblock %}

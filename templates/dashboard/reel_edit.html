@@ -1,0 +1,148 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Edit reel — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <a href="{% url 'dashboard:reels' %}" class="text-sm text-stone-500 hover:text-stone-700">← Reels</a>
+  <h1 class="font-display text-3xl text-stone-900 mt-2">{{ object.title }}</h1>
+</div>
+
+{% if reel_duration_warning %}
+<div class="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 max-w-5xl">
+  <strong>Heads up:</strong> reels are designed for 20–90s clips. This one is
+  <strong>{{ object.duration_seconds }}s</strong> — the app's Reel feed may filter
+  it out depending on its rules. You can keep it as a reel, or move it to Videos
+  by re-uploading there.
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-2 gap-6 max-w-5xl">
+  <!-- Preview -->
+  <div class="space-y-3">
+    {% if object.status == 'ready' and object.bunny_video_guid and bunny_library_id %}
+    <div class="aspect-video bg-stone-900 rounded-xl overflow-hidden">
+      <iframe
+        src="https://iframe.mediadelivery.net/embed/{{ bunny_library_id }}/{{ object.bunny_video_guid }}?autoplay=false"
+        loading="lazy"
+        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+        allowfullscreen
+        class="w-full h-full" frameborder="0"></iframe>
+    </div>
+    {% elif object.status == 'ready' %}
+    <div class="aspect-video bg-stone-100 rounded-xl flex items-center justify-center text-stone-500 text-sm text-center px-6">
+      Reel is ready on Bunny but the dashboard can't build a player URL.
+      Check that <code>BUNNY_STREAM_LIBRARY_ID</code> is set in Railway.
+    </div>
+    {% else %}
+    <div class="aspect-video bg-stone-100 rounded-xl flex items-center justify-center text-stone-500 text-sm">
+      Status: {{ object.get_status_display }}
+    </div>
+    {% endif %}
+
+    <dl class="bg-white rounded-xl border border-stone-200 p-5 text-sm space-y-2">
+      <div class="flex justify-between"><dt class="text-stone-500">Bunny GUID</dt><dd class="font-mono text-xs">{{ object.bunny_video_guid }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Status</dt><dd>{{ object.get_status_display }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Duration</dt>
+        <dd class="{% if reel_duration_warning %}text-amber-700{% endif %}">
+          {{ object.duration_seconds|default:"—" }}s
+          {% if reel_duration_warning %}<span class="text-xs">(outside 20–90s)</span>{% endif %}
+        </dd>
+      </div>
+      <div class="flex justify-between"><dt class="text-stone-500">Resolution</dt><dd>{% if object.width %}{{ object.width }}×{{ object.height }}{% else %}—{% endif %}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Views</dt><dd>{{ view_count }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Likes</dt><dd>{{ like_count }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Comments</dt><dd>{{ comment_count }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">HLS URL</dt><dd class="text-xs truncate ml-4">{{ object.hls_url }}</dd></div>
+    </dl>
+
+    <form method="post" action="{% url 'dashboard:reel-delete' object.id %}" onsubmit="return confirm('Delete this reel from Bunny? This cannot be undone.')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost text-red-600 hover:bg-red-50">Delete reel</button>
+    </form>
+  </div>
+
+  <!-- Metadata form -->
+  <form method="post" class="bg-white rounded-xl border border-stone-200 p-6 space-y-5 h-fit">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Title</label>
+      {{ form.title }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Description</label>
+      {{ form.description }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Minimum tier to watch</label>
+      {{ form.min_tier }}
+      <p class="text-xs text-stone-500 mt-1">"Public" = guests + everyone. Higher tiers stack.</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Schedule publish</label>
+      {{ form.publish_at }}
+      <p class="text-xs text-stone-500 mt-1">Leave blank to publish immediately when "Publish to the app" is on.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.is_featured }}
+      <label class="text-sm text-stone-700">Feature this reel</label>
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.is_published }}
+      <label class="text-sm text-stone-700">Publish to the app</label>
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.comments_enabled }}
+      <label class="text-sm text-stone-700">Allow comments on this reel</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Save changes</button>
+  </form>
+</div>
+
+<!-- Comment moderation -->
+<div class="max-w-5xl mt-8">
+  <div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
+      <div>
+        <h2 class="font-display text-lg text-stone-900">Comments</h2>
+        <p class="text-xs text-stone-500 mt-1">
+          {{ comment_count }} total · {{ like_count }} like{{ like_count|pluralize }}
+          {% if not object.comments_enabled %}
+            · <span class="text-amber-700">Posting disabled</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    {% if comments %}
+    <ul class="divide-y divide-stone-100">
+      {% for c in comments %}
+      <li class="px-5 py-4 flex items-start gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 text-sm">
+            <span class="font-medium text-stone-900">
+              {{ c.user.first_name|default:c.user.username|default:c.user.email }}
+              {% if not c.user.first_name and c.user.last_name %}{{ c.user.last_name }}{% endif %}
+            </span>
+            <span class="text-xs text-stone-400">{{ c.created_at|date:"M j, Y · H:i" }}</span>
+          </div>
+          <p class="text-sm text-stone-700 mt-1 whitespace-pre-wrap">{{ c.body }}</p>
+        </div>
+        <form method="post"
+              action="{% url 'dashboard:video-comment-delete' object.id c.id %}"
+              onsubmit="return confirm('Delete this comment? It will be removed for everyone.');">
+          {% csrf_token %}
+          <button type="submit"
+                  class="btn btn-ghost text-xs text-red-600 hover:bg-red-50">
+            Delete
+          </button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="px-5 py-10 text-center text-stone-500 text-sm">
+      No comments yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

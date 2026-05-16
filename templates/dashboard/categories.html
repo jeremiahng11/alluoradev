@@ -1,0 +1,64 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Article categories — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <h1 class="font-display text-3xl text-stone-900">Article categories</h1>
+  <p class="text-sm text-stone-500 mt-1">Used to group articles in the app's content library.</p>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-6">
+  <!-- Add new category -->
+  <form method="post" action="{% url 'dashboard:category-create' %}" class="bg-white rounded-xl border border-stone-200 p-5 space-y-3 h-fit">
+    {% csrf_token %}
+    <h2 class="font-medium text-stone-900">Add a category</h2>
+    <div>
+      <label class="block text-xs uppercase tracking-wider text-stone-500 mb-1">Name</label>
+      {{ form.name }}
+      {% if form.name.errors %}<p class="text-xs text-red-700 mt-1">{{ form.name.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label class="block text-xs uppercase tracking-wider text-stone-500 mb-1">Slug</label>
+      {{ form.slug }}
+      <p class="text-xs text-stone-400 mt-1">Optional. Auto-generated from name if left blank.</p>
+      {% if form.slug.errors %}<p class="text-xs text-red-700 mt-1">{{ form.slug.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label class="block text-xs uppercase tracking-wider text-stone-500 mb-1">Sort order</label>
+      {{ form.sort_order }}
+    </div>
+    <button type="submit" class="btn btn-primary w-full">Add category</button>
+  </form>
+
+  <!-- List + edit/delete -->
+  <div class="lg:col-span-2 bg-white rounded-xl border border-stone-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+        <tr>
+          <th class="text-left px-5 py-3">Name</th>
+          <th class="text-left px-5 py-3">Slug</th>
+          <th class="text-left px-5 py-3">Order</th>
+          <th class="text-left px-5 py-3">Articles</th>
+          <th class="text-right px-5 py-3 w-32">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for c in categories %}
+        <tr>
+          <td class="px-5 py-3 font-medium text-stone-900">{{ c.name }}</td>
+          <td class="px-5 py-3 text-stone-500 font-mono text-xs">{{ c.slug }}</td>
+          <td class="px-5 py-3 text-stone-500">{{ c.sort_order }}</td>
+          <td class="px-5 py-3 text-stone-500">{{ c.article_count }}</td>
+          <td class="px-5 py-3 text-right space-x-2">
+            <a href="{% url 'dashboard:category-edit' c.id %}" class="btn btn-ghost text-xs">Edit</a>
+            <a href="{% url 'dashboard:category-delete' c.id %}" class="btn btn-ghost text-xs text-red-700">Delete</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="px-5 py-12 text-center text-stone-500">No categories yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

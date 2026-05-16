@@ -1,0 +1,175 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Settings — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <h1 class="font-display text-3xl text-stone-900">Settings</h1>
+  <p class="text-sm text-stone-500 mt-1">Environment config (read-only) and Skin AI per-tier rules.</p>
+</div>
+
+{# ─── Environment ─────────────────────────────────────────────── #}
+<div class="mb-8">
+  <h2 class="font-display text-xl text-stone-900 mb-3">Environment</h2>
+  <p class="text-xs text-stone-500 mb-3">Edit values in your Railway project settings, then redeploy.</p>
+  <div class="bg-white rounded-xl border border-stone-200 overflow-hidden max-w-3xl">
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-stone-100">
+        {% for key, val in env.items %}
+        <tr>
+          <th class="text-left px-5 py-3 font-medium text-stone-700 w-2/5">{{ key }}</th>
+          <td class="px-5 py-3 text-stone-600 font-mono text-xs">{{ val }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ─── Skin AI per-tier rules ──────────────────────────────────── #}
+<div class="mb-8">
+  <div class="flex items-end justify-between mb-3">
+    <div>
+      <h2 class="font-display text-xl text-stone-900">Skin AI rules</h2>
+      <p class="text-xs text-stone-500 mt-1 max-w-2xl">
+        Per-tier quota and Glow Coin pricing for the in-app Skin AI scan.
+        Set how many free scans members get per day / week / month, what
+        the next scan costs in Glow Coins after that, or mark a tier as
+        unlimited (Titanium / invitation-only).
+      </p>
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'dashboard:skin-ai-settings-update' %}"
+        class="bg-white rounded-xl border border-stone-200 p-5">
+    {% csrf_token %}
+
+    <div class="space-y-4">
+      {% for rule in skin_ai_rules %}
+      <div class="rounded-lg border border-stone-200 p-4"
+           x-data="{ unlimited: {{ rule.unlimited_free|yesno:'true,false' }} }">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="inline-block w-2 h-2 rounded-full
+            {% if rule.tier == 'Silver' %}bg-stone-400
+            {% elif rule.tier == 'Gold' %}bg-amber-400
+            {% elif rule.tier == 'Platinum' %}bg-slate-400
+            {% elif rule.tier == 'Titanium' %}bg-stone-700
+            {% else %}bg-stone-300{% endif %}"></span>
+          <h3 class="font-medium text-stone-900">{{ rule.get_tier_display }}</h3>
+          <label class="ml-auto inline-flex items-center gap-2 text-sm text-stone-600">
+            <input type="checkbox"
+                   name="rule_{{ rule.id }}_unlimited_free"
+                   x-model="unlimited"
+                   {% if rule.unlimited_free %}checked{% endif %}>
+            Unlimited free (no quota, no coins)
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4"
+             :class="unlimited ? 'opacity-40 pointer-events-none' : ''">
+          <div>
+            <label class="block text-xs uppercase tracking-wider text-stone-500 mb-1">
+              Free scans
+            </label>
+            <input type="number" min="0" step="1"
+                   name="rule_{{ rule.id }}_free_scans_per_period"
+                   value="{{ rule.free_scans_per_period }}"
+                   class="form-input">
+          </div>
+          <div>
+            <label class="block text-xs uppercase tracking-wider text-stone-500 mb-1">
+              Period
+            </label>
+            <select name="rule_{{ rule.id }}_period_unit" class="form-input">
+              {% for value, label in skin_ai_period_choices %}
+                <option value="{{ value }}"
+                  {% if rule.period_unit == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs uppercase tracking-wider text-stone-500 mb-1">
+              Coins per extra scan
+            </label>
+            <input type="number" min="0" step="1"
+                   name="rule_{{ rule.id }}_coin_cost_per_scan"
+                   value="{{ rule.coin_cost_per_scan }}"
+                   class="form-input">
+          </div>
+        </div>
+
+        <p class="text-[11px] text-stone-400 mt-2" x-show="!unlimited">
+          {% if rule.free_scans_per_period > 0 %}
+            Reads as: {{ rule.free_scans_per_period }} free per {{ rule.period_unit }},
+            then {{ rule.coin_cost_per_scan }} Glow Coins each.
+          {% else %}
+            No free scans; every scan costs {{ rule.coin_cost_per_scan }} Glow Coins.
+          {% endif %}
+        </p>
+        <p class="text-[11px] text-green-700 mt-2" x-show="unlimited">
+          Unlimited — this tier always gets free scans.
+        </p>
+      </div>
+      {% empty %}
+      <div class="py-6 text-center text-stone-500 text-sm">
+        No tier rules yet. Refresh — defaults are seeded on first load.
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="mt-5 flex items-center justify-between">
+      <p class="text-[11px] text-stone-500">
+        Day = midnight local. Week = Monday 00:00. Month = day 1 at 00:00.
+        Period changes take effect on the next quota check.
+      </p>
+      <button type="submit" class="btn btn-primary text-sm">Save Skin AI rules</button>
+    </div>
+  </form>
+</div>
+
+{# ─── Skin AI product cache ──────────────────────────────────── #}
+<div class="bg-white rounded-xl border border-stone-200 p-5 max-w-3xl mb-6">
+  <h2 class="font-medium text-stone-900 mb-1">Skin AI product cache</h2>
+  <p class="text-sm text-stone-600 mb-3">
+    The recommendation engine caches the WooCommerce product list for
+    1 hour per fetch. Clear it after editing products / tags so the
+    next scan picks up the changes immediately.
+  </p>
+  <form method="post" action="{% url 'dashboard:skin-ai-clear-products-cache' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{% url 'dashboard:settings' %}">
+    <button type="submit" class="btn btn-ghost text-sm">
+      Clear product cache now
+    </button>
+  </form>
+</div>
+
+{# ─── Skin AI tier-average benchmarking ─────────────────────── #}
+<div class="bg-white rounded-xl border border-stone-200 p-5 max-w-3xl mb-6">
+  <h2 class="font-medium text-stone-900 mb-1">Tier-average benchmarking</h2>
+  <p class="text-sm text-stone-600 mb-3">
+    Auto-activates once each tier has at least
+    <code class="text-xs">SKINAI_TIER_AVG_MIN_USERS</code> users with
+    a recent scan (default 10). Below the floor the in-app result
+    screen hides the &ldquo;vs <em>tier</em> average&rdquo; block
+    entirely. Lower the env var to flip it on early; force a
+    recompute below if you've changed the threshold.
+  </p>
+  <form method="post" action="{% url 'dashboard:skin-ai-refresh-tier-averages' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{% url 'dashboard:settings' %}">
+    <button type="submit" class="btn btn-ghost text-sm">
+      Refresh tier averages now
+    </button>
+  </form>
+</div>
+
+{# ─── API docs ────────────────────────────────────────────────── #}
+<div class="bg-white rounded-xl border border-stone-200 p-5 max-w-3xl">
+  <h2 class="font-medium text-stone-900 mb-3">API documentation</h2>
+  <p class="text-sm text-stone-600">Browse the live API schema:</p>
+  <a href="/api/docs/" target="_blank" class="btn btn-ghost mt-2">Open Swagger UI →</a>
+</div>
+
+{# Alpine for the unlimited-free checkbox interactivity in the Skin AI section. #}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}

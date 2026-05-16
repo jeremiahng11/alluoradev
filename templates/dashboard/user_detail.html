@@ -1,0 +1,110 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}{{ app_user.email }} — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <a href="{% url 'dashboard:users' %}" class="text-sm text-stone-500 hover:text-stone-700">← Users</a>
+  <h1 class="font-display text-3xl text-stone-900 mt-2">{{ app_user.display_name_or_email }}</h1>
+  <p class="text-sm text-stone-500">{{ app_user.email }}</p>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-6">
+  <!-- Profile -->
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <h2 class="font-medium text-stone-900 mb-4">Profile</h2>
+    <dl class="text-sm space-y-2">
+      <div class="flex justify-between"><dt class="text-stone-500">First name</dt><dd>{{ app_user.first_name|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Last name</dt><dd>{{ app_user.last_name|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Phone</dt><dd>{{ app_user.phone|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">WP user ID</dt><dd class="font-mono">{{ app_user.wp_user_id|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Joined</dt><dd>{{ app_user.date_joined|date:"M j, Y" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">Last synced</dt><dd>{% if app_user.last_synced_at %}{{ app_user.last_synced_at|timesince }} ago{% else %}—{% endif %}</dd></div>
+    </dl>
+  </div>
+
+  <!-- WooCommerce spending -->
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-medium text-stone-900">WooCommerce spending</h2>
+      <form method="post" action="{% url 'dashboard:user-sync-spending' app_user.id %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost text-xs">↻ Sync now</button>
+      </form>
+    </div>
+    <div class="font-display text-4xl text-stone-900">${{ app_user.total_spent }}</div>
+    <p class="text-xs text-stone-500 mt-1">
+      {% if app_user.spending_synced_at %}Synced {{ app_user.spending_synced_at|timesince }} ago{% else %}Never synced — click ↻ Sync now{% endif %}
+    </p>
+    <p class="text-xs text-stone-400 mt-3">A sync also re-evaluates the user's tier against the rules on the Membership page. Invite-only tiers (Titanium) don't auto-change.</p>
+  </div>
+
+  <!-- Glow Coins -->
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <h2 class="font-medium text-stone-900 mb-4">Glow Coins</h2>
+    <div class="font-display text-4xl text-brand-600">{{ balance }}</div>
+    <p class="text-xs text-stone-500 mb-1">Glow coin balance</p>
+    <p class="text-xs text-stone-400 mb-4">
+      {% if balance_source == 'wp' %}Live from WordPress{% else %}From local ledger (WP unreachable){% endif %}
+    </p>
+    <ul class="text-sm space-y-2 max-h-64 overflow-y-auto">
+      {% for entry in ledger %}
+      <li class="flex justify-between border-b border-stone-100 pb-1">
+        <span class="text-stone-700 truncate">{{ entry.description|default:entry.get_source_display }}</span>
+        <span class="font-medium {% if entry.points > 0 %}text-green-700{% else %}text-red-700{% endif %}">{{ entry.points|stringformat:"+d" }}</span>
+      </li>
+      {% empty %}
+      <li class="text-stone-400 text-sm">No Django-originated history yet</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- Membership -->
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <h2 class="font-medium text-stone-900 mb-4">Membership</h2>
+    <dl class="text-sm space-y-2 mb-4">
+      <div class="flex justify-between"><dt class="text-stone-500">Membership #</dt>
+        <dd class="font-mono text-stone-900">
+          {% if app_user.membership_number %}{{ app_user.membership_number|slice:":4" }} {{ app_user.membership_number|slice:"4:8" }} {{ app_user.membership_number|slice:"8:12" }}{% else %}—{% endif %}
+        </dd>
+      </div>
+      <div class="flex justify-between"><dt class="text-stone-500">Card prefix</dt>
+        <dd class="font-mono text-stone-700">{{ app_user.card_number_prefix|default:"—" }}</dd>
+      </div>
+      <div class="flex justify-between"><dt class="text-stone-500">Current tier</dt>
+        <dd class="font-medium text-stone-900">{{ app_user.tier }}</dd>
+      </div>
+    </dl>
+    <form method="post" action="{% url 'dashboard:user-tier-update' app_user.id %}" class="flex gap-2 items-center">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <label class="text-xs text-stone-500">Change tier:</label>
+      <select name="tier" class="form-select text-sm flex-1">
+        {% for value, label in tier_choices %}
+          <option value="{{ value }}" {% if value == app_user.tier %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary text-sm">Save</button>
+    </form>
+  </div>
+
+  <!-- Quiz history -->
+  <div class="bg-white rounded-xl border border-stone-200 p-5">
+    <h2 class="font-medium text-stone-900 mb-4">Quiz history</h2>
+    <ul class="text-sm space-y-3">
+      {% for sub in submissions %}
+      <li>
+        <div class="flex justify-between">
+          <span class="text-stone-700">{{ sub.quiz.name }}</span>
+          <span class="text-xs text-stone-500">{{ sub.submitted_at|date:"M j" }}</span>
+        </div>
+        {% if sub.primary_result %}
+          <span class="pill bg-brand-50 text-brand-700">{{ sub.primary_result.name }}</span>
+        {% endif %}
+      </li>
+      {% empty %}
+      <li class="text-stone-400 text-sm">No quiz submissions yet</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

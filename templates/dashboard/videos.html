@@ -1,0 +1,96 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Videos — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="flex items-end justify-between mb-6">
+  <div>
+    <h1 class="font-display text-3xl text-stone-900">Videos</h1>
+    <p class="text-sm text-stone-500 mt-1">Hosted on Bunny Stream. Streamed via HLS.</p>
+  </div>
+  {% if bunny_configured %}
+  <a href="{% url 'dashboard:video-create' %}" class="btn btn-primary">+ Upload video</a>
+  {% endif %}
+</div>
+
+{% if not bunny_configured %}
+<div class="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+  <strong>Bunny Stream isn't configured.</strong> Set <code>BUNNY_STREAM_API_KEY</code>, <code>BUNNY_STREAM_LIBRARY_ID</code>, and (optionally) <code>BUNNY_STREAM_CDN_HOSTNAME</code> in Railway env vars. Until then, video uploads are disabled.
+</div>
+{% endif %}
+
+<div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+      <tr>
+        <th class="text-left px-5 py-3"></th>
+        <th class="text-left px-5 py-3">Title</th>
+        <th class="text-left px-5 py-3">Collection</th>
+        <th class="text-left px-5 py-3">Tier</th>
+        <th class="text-left px-5 py-3">Status</th>
+        <th class="text-left px-5 py-3">Duration</th>
+        <th class="text-right px-5 py-3">Views</th>
+        <th class="text-right px-5 py-3">Comments</th>
+        <th class="text-right px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for v in videos %}
+      <tr>
+        <td class="px-5 py-3">
+          {% if v.status == 'ready' %}
+            <img src="{{ v.thumbnail_url }}" alt="" class="w-16 h-9 object-cover rounded" onerror="this.style.display='none'">
+          {% else %}
+            <div class="w-16 h-9 bg-stone-100 rounded"></div>
+          {% endif %}
+        </td>
+        <td class="px-5 py-3 font-medium text-stone-900">
+          <a href="{% url 'dashboard:video-edit' v.id %}" class="hover:text-brand-600">{{ v.title }}</a>
+          <div class="text-xs text-stone-400 font-mono">{{ v.bunny_video_guid|truncatechars:20 }}</div>
+        </td>
+        <td class="px-5 py-3 text-stone-600">{{ v.collection.name|default:"—" }}</td>
+        <td class="px-5 py-3 text-stone-600 text-xs uppercase tracking-wider">{% if v.min_tier == 'none' %}Public{% else %}{{ v.min_tier }}{% endif %}</td>
+        <td class="px-5 py-3 align-middle">
+          <div class="flex flex-wrap items-center gap-1.5">
+            {% if v.status == 'ready' %}
+              <span class="pill bg-green-100 text-green-700">Ready</span>
+            {% elif v.status == 'processing' %}
+              <span class="pill bg-blue-100 text-blue-700">Processing</span>
+            {% elif v.status == 'uploading' %}
+              <span class="pill bg-amber-100 text-amber-700">Uploading</span>
+            {% elif v.status == 'failed' %}
+              <span class="pill bg-red-100 text-red-700">Failed</span>
+            {% else %}
+              <span class="pill bg-stone-100 text-stone-600">Created</span>
+            {% endif %}
+            {% if v.is_published %}
+              <span class="pill bg-brand-50 text-brand-700">Published</span>
+            {% endif %}
+          </div>
+        </td>
+        <td class="px-5 py-3 text-stone-600">
+          {% if v.duration_seconds %}{{ v.duration_seconds }}s{% else %}—{% endif %}
+        </td>
+        <td class="px-5 py-3 text-right text-stone-700 tabular-nums">{{ v.view_count|default:0 }}</td>
+        <td class="px-5 py-3 text-right text-stone-700 tabular-nums">{{ v.comment_count|default:0 }}</td>
+        <td class="px-5 py-3 text-right">
+          <a href="{% url 'dashboard:video-edit' v.id %}" class="btn btn-ghost text-xs">Edit</a>
+          <a href="{% url 'dashboard:video-delete' v.id %}" class="btn btn-ghost text-xs text-red-600 hover:bg-red-50">Delete</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="9" class="px-5 py-12 text-center text-stone-500">No videos yet.{% if bunny_configured %} <a href="{% url 'dashboard:video-create' %}" class="text-brand-600 hover:underline">Upload your first one →</a>{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+<div class="mt-4 flex items-center justify-between text-sm">
+  <span class="text-stone-500">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}" class="btn btn-ghost">← Prev</a>{% endif %}
+    {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}" class="btn btn-ghost">Next →</a>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
