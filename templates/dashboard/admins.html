@@ -1,0 +1,69 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}Admins — Alluora Dashboard{% endblock %}
+
+{% block dashboard %}
+<div class="flex items-end justify-between mb-6">
+  <div>
+    <h1 class="font-display text-3xl text-stone-900">Admins</h1>
+    <p class="text-sm text-stone-500 mt-1">Anyone listed here can sign into this dashboard.</p>
+  </div>
+  <a href="{% url 'dashboard:admin-create' %}" class="btn btn-primary">+ Add admin</a>
+</div>
+
+<div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+      <tr>
+        <th class="text-left px-5 py-3">Name / Email</th>
+        <th class="text-left px-5 py-3">Joined</th>
+        <th class="text-left px-5 py-3">Role</th>
+        <th class="text-right px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for a in admins %}
+      <tr>
+        <td class="px-5 py-3">
+          <div class="font-medium text-stone-900">
+            {{ a.display_name_or_email }}
+            {% if a.pk == request.user.pk %}<span class="text-xs text-stone-400 ml-1">(you)</span>{% endif %}
+          </div>
+          {% if a.first_name or a.last_name %}<div class="text-xs text-stone-500 mt-0.5">{{ a.email }}</div>{% endif %}
+        </td>
+        <td class="px-5 py-3 text-stone-500">{{ a.date_joined|date:"M j, Y" }}</td>
+        <td class="px-5 py-3">
+          {% if a.is_main_admin %}
+            <span class="pill bg-amber-100 text-amber-700">Main admin</span>
+          {% else %}
+            <span class="pill bg-stone-100 text-stone-600">Admin</span>
+          {% endif %}
+        </td>
+        <td class="px-5 py-3 text-right">
+          {% if a.is_main_admin %}
+            <span class="text-xs text-stone-400 italic">Protected</span>
+          {% elif a.pk == request.user.pk %}
+            <span class="text-xs text-stone-400 italic">Can't revoke yourself</span>
+          {% else %}
+            <form method="post" action="{% url 'dashboard:admin-revoke' a.id %}" class="inline">
+              {% csrf_token %}
+              <button type="submit"
+                      onclick="return confirm('Remove dashboard access for {{ a.display_name_or_email|escapejs }}?');"
+                      class="btn btn-ghost text-xs text-red-600 hover:bg-red-50">Revoke access</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="px-5 py-12 text-center text-stone-500">No other admins yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<p class="text-xs text-stone-500 mt-4">
+  Revoking access leaves the user account intact (so any content they authored keeps its byline) — only the dashboard sign-in is removed.
+  {% if request.user.is_main_admin %}
+    As the main admin, you can see every dashboard account here. The main role can't be transferred from this screen.
+  {% endif %}
+</p>
+{% endblock %}

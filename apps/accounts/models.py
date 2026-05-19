@@ -38,6 +38,16 @@ class AppUser(AbstractUser):
         default=False,
         help_text='Can sign into the custom admin dashboard.',
     )
+    # The "main admin" — typically the bootstrap account created by
+    # `manage.py create_admin`. Hidden from the Admins list/edit views
+    # for every OTHER dashboard admin, and cannot be revoked by anyone
+    # else. Only one row should have this set at a time (enforced by
+    # the dashboard create-admin view, which never raises the flag).
+    is_main_admin = models.BooleanField(
+        default=False,
+        help_text='Owner account — invisible to other dashboard admins '
+                  'and protected from being demoted/deleted by them.',
+    )
 
     # Membership card. The 8-digit prefix is generated server-side on first
     # sync and never changes; the visible card number on the app combines

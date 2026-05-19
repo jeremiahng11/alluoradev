@@ -385,6 +385,148 @@ class EbookEditView(DashboardView, UpdateView):
         return ctx
 
 
+class AdminCreateForm(forms.Form):
+    """Used by AdminCreateView. Not a ModelForm because we need
+    password handling + uniqueness checks tailored to the dashboard's
+    expectations (email is the login identifier, not a username)."""
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={
+            'class': 'form-input',
+            'autocomplete': 'off',
+        }),
+    )
+    first_name = forms.CharField(
+        max_length=80, required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input'}),
+    )
+    last_name = forms.CharField(
+        max_length=80, required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input'}),
+    )
+    password = forms.CharField(
+        min_length=8,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'autocomplete': 'new-password',
+        }),
+        help_text='Min 8 characters. Share securely with the new admin '
+                  'and have them change it after first login.',
+    )
+
+    def clean_email(self):
+        email = (self.cleaned_data.get('email') or '').strip().lower()
+        existing = User.objects.filter(email__iexact=email).first()
+        if existing:
+            if existing.is_dashboard_admin:
+                raise forms.ValidationError(
+                    'That email already has dashboard access.'
+                )
+            # Existing app user — we don't want to silently promote a
+            # mobile-app customer to dashboard admin via this form, so
+            # block it. Operator can do that explicitly via the User
+            # detail page or via /django-admin/.
+            raise forms.ValidationError(
+                'An app user already exists with that email. Promote '
+                'them via the user detail page instead.'
+            )
+        return email
+
+
+class AdminListView(DashboardView, ListView):
+    """List of all dashboard admins. The main admin is filtered out
+    for viewers who AREN'T the main admin themselves (the requirement:
+    "main admin account is hidden from other admin accounts")."""
+    template_name = 'dashboard/admins.html'
+    paginate_by = 30
+    context_object_name = 'admins'
+
+    def get_queryset(self):
+        qs = User.objects.filter(is_dashboard_admin=True).order_by(
+            '-is_main_admin', 'date_joined',
+        )
+        if not self.request.user.is_main_admin:
+            qs = qs.filter(is_main_admin=False)
+        return qs
+
+
+class AdminCreateView(DashboardView, View):
+    """Add a new dashboard admin. Any existing admin can do this;
+    the new admin is created with is_dashboard_admin=True but never
+    is_main_admin=True (the main flag can only come from the bootstrap
+    command). Idempotent on email collision via the form's clean
+    method."""
+    template = 'dashboard/admin_form.html'
+
+    def get(self, request):
+        return render(request, self.template, {'form': AdminCreateForm()})
+
+    def post(self, request):
+        form = AdminCreateForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template, {'form': form})
+
+        email = form.cleaned_data['email']
+        # Build a unique username from the email local-part; same
+        # collision-avoidance pattern as the WP plugin's registration.
+        base_username = email.split('@')[0][:140] or 'admin'
+        username = base_username
+        i = 1
+        while User.objects.filter(username=username).exists():
+            username = f'{base_username}{i}'
+            i += 1
+
+        new_admin = User(
+            email=email,
+            username=username,
+            first_name=form.cleaned_data.get('first_name', ''),
+            last_name=form.cleaned_data.get('last_name', ''),
+            is_staff=True,
+            is_dashboard_admin=True,
+            is_main_admin=False,
+        )
+        new_admin.set_password(form.cleaned_data['password'])
+        new_admin.save()
+        messages.success(
+            request,
+            f'Added dashboard admin: {email}. They can sign in now.',
+        )
+        return redirect('dashboard:admins')
+
+
+class AdminRevokeView(DashboardView, View):
+    """POST /dashboard/admins/<pk>/revoke/ — drops is_dashboard_admin
+    on the target user. The user account itself stays (so any owned
+    content / authored articles keep their author reference); only
+    dashboard access is removed.
+
+    Protections:
+      - The main admin can NEVER be revoked through this endpoint.
+      - A user cannot revoke themselves (would lock out the dashboard
+        if they're the last admin standing — and is just confusing UX).
+    """
+
+    def post(self, request, pk):
+        target = get_object_or_404(User, pk=pk, is_dashboard_admin=True)
+        if target.is_main_admin:
+            messages.error(request, 'The main admin cannot be revoked.')
+            return redirect('dashboard:admins')
+        if target.pk == request.user.pk:
+            messages.error(
+                request,
+                "You can't revoke your own dashboard access. "
+                'Ask another admin to do it.',
+            )
+            return redirect('dashboard:admins')
+        target.is_dashboard_admin = False
+        target.is_staff = False
+        target.save(update_fields=['is_dashboard_admin', 'is_staff'])
+        messages.success(
+            request,
+            f'Removed dashboard access for {target.display_name_or_email}.',
+        )
+        return redirect('dashboard:admins')
+
+
 class EbookDeleteView(DashboardView, DeleteView):
     model = Ebook
     template_name = 'dashboard/confirm_delete.html'

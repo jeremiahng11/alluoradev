@@ -72,6 +72,15 @@ urlpatterns = [
     # Settings
     path('settings/', views.SettingsView.as_view(), name='settings'),
 
+    # Dashboard admins — add new admins + revoke access. Visible to
+    # every admin; the main admin's own row is hidden from non-main
+    # viewers (server-side filter in AdminListView).
+    path('admins/', views.AdminListView.as_view(), name='admins'),
+    path('admins/new/', views.AdminCreateView.as_view(),
+         name='admin-create'),
+    path('admins/<int:pk>/revoke/', views.AdminRevokeView.as_view(),
+         name='admin-revoke'),
+
     # Skin AI tier rules now live inside the Settings page; only the
     # update POST handler remains as its own URL.
     path('skin-ai/settings/update/',

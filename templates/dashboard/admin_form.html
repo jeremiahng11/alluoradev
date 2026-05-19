@@ -1,0 +1,43 @@
+{% extends "dashboard/_layout.html" %}
+{% block title %}New admin{% endblock %}
+
+{% block dashboard %}
+<div class="mb-6">
+  <a href="{% url 'dashboard:admins' %}" class="text-sm text-stone-500 hover:text-stone-700">← Admins</a>
+  <h1 class="font-display text-3xl text-stone-900 mt-2">Add dashboard admin</h1>
+  <p class="text-sm text-stone-500 mt-1">Grants sign-in access to this dashboard. Share the password with the new admin securely — they'll be able to change it after first login.</p>
+</div>
+
+<form method="post" class="bg-white rounded-xl border border-stone-200 p-6 space-y-5 max-w-xl">
+  {% csrf_token %}
+
+  <div>
+    <label class="block text-sm font-medium text-stone-700 mb-2">Email</label>
+    {{ form.email }}
+    {% if form.email.errors %}<p class="text-xs text-red-600 mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+  </div>
+
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">First name <span class="text-stone-400">(optional)</span></label>
+      {{ form.first_name }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-stone-700 mb-2">Last name <span class="text-stone-400">(optional)</span></label>
+      {{ form.last_name }}
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-stone-700 mb-2">Initial password</label>
+    {{ form.password }}
+    <p class="text-xs text-stone-500 mt-1">{{ form.password.help_text }}</p>
+    {% if form.password.errors %}<p class="text-xs text-red-600 mt-1">{{ form.password.errors.0 }}</p>{% endif %}
+  </div>
+
+  <div class="flex items-center justify-between pt-4 border-t border-stone-200">
+    <a href="{% url 'dashboard:admins' %}" class="btn btn-ghost">Cancel</a>
+    <button type="submit" class="btn btn-primary">Create admin</button>
+  </div>
+</form>
+{% endblock %}
