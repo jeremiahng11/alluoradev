@@ -16,10 +16,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='dev-secret-change-me-in-production')
 DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
 
-# Railway sets RAILWAY_PUBLIC_DOMAIN and RAILWAY_PRIVATE_DOMAIN.
+# Railway sets RAILWAY_PUBLIC_DOMAIN and RAILWAY_PRIVATE_DOMAIN. The
+# production custom domain (alluora.rudratech.sg) is baked into the
+# default so a fresh deploy works without anyone having to set the
+# env var first — DJANGO_ALLOWED_HOSTS still overrides for other
+# environments.
 ALLOWED_HOSTS = config(
     'DJANGO_ALLOWED_HOSTS',
-    default='localhost,127.0.0.1,.railway.app',
+    default='localhost,127.0.0.1,.railway.app,alluora.rudratech.sg',
     cast=Csv(),
 )
 # Auto-add Railway public domain if present.
@@ -27,9 +31,16 @@ RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
 if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
 
+# CSRF_TRUSTED_ORIGINS needs the SCHEME — wildcards work for the
+# Railway subdomain pattern but the custom apex / sub-domain has to
+# be listed explicitly.
 CSRF_TRUSTED_ORIGINS = config(
     'DJANGO_CSRF_TRUSTED_ORIGINS',
-    default='http://localhost:8000,https://*.railway.app',
+    default=(
+        'http://localhost:8000,'
+        'https://*.railway.app,'
+        'https://alluora.rudratech.sg'
+    ),
     cast=Csv(),
 )
 
