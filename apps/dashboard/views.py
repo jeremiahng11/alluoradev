@@ -26,7 +26,9 @@ from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView, DetailView,
 )
 
-from apps.content.models import Article, ContentCategory, ArticleView, Ebook
+from apps.content.models import (
+    Article, ContentCategory, ArticleView, Ebook, EbookDownload,
+)
 from apps.videos.models import Video, VideoCollection, VideoComment, VideoView
 from apps.videos import bunny
 from apps.rewards.models import RewardLedger, Badge
@@ -304,6 +306,37 @@ class EbookListView(DashboardView, ListView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['q'] = self.request.GET.get('q', '')
+
+        # Top-line download stats — all-time, 7-day, 30-day windows.
+        # Counts ALL download events (free + members-only, signed-in +
+        # guest), so the number matches what the admin sees in the
+        # per-ebook history. Empty library returns zeros, not None.
+        now = timezone.now()
+        d7 = now - timezone.timedelta(days=7)
+        d30 = now - timezone.timedelta(days=30)
+        downloads = EbookDownload.objects.all()
+        ctx['stats'] = {
+            'ebook_count': Ebook.objects.count(),
+            'published_count': Ebook.objects.filter(
+                status=Ebook.STATUS_PUBLISHED).count(),
+            'members_only_count': Ebook.objects.filter(
+                is_members_only=True).count(),
+            'downloads_all': downloads.count(),
+            'downloads_d7': downloads.filter(created_at__gte=d7).count(),
+            'downloads_d30': downloads.filter(created_at__gte=d30).count(),
+        }
+        # Top 5 ebooks by downloads in the last 30 days — drives the
+        # "what's working" admin instinct without making them sort the
+        # whole table.
+        ctx['top_ebooks'] = list(
+            Ebook.objects.annotate(
+                window_downloads=Count(
+                    'download_events',
+                    filter=Q(download_events__created_at__gte=d30),
+                ),
+            ).filter(window_downloads__gt=0)
+             .order_by('-window_downloads')[:5]
+        )
         return ctx
 
 
@@ -327,6 +360,29 @@ class EbookEditView(DashboardView, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, 'Ebook saved.')
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        # Recent download events for this ebook — drives the activity
+        # panel below the edit form. Capped to 25 rows so a popular
+        # ebook doesn't make the edit page do an unbounded query.
+        ctx['recent_downloads'] = (
+            self.object.download_events
+            .select_related('user')
+            .order_by('-created_at')[:25]
+        )
+        # Quick unique-user count for the panel header. Distinct on
+        # user_id excludes the NULLs (guests), which is what we want
+        # — "X members have downloaded this".
+        ctx['unique_downloaders'] = (
+            self.object.download_events
+            .filter(user__isnull=False)
+            .values('user_id').distinct().count()
+        )
+        ctx['guest_downloads'] = (
+            self.object.download_events.filter(user__isnull=True).count()
+        )
+        return ctx
 
 
 class EbookDeleteView(DashboardView, DeleteView):
@@ -1294,6 +1350,7 @@ class StatsView(DashboardView, TemplateView):
         video_views = VideoView.objects.filter(is_reel=False)
         reel_views = VideoView.objects.filter(is_reel=True)
         article_views = ArticleView.objects.all()
+        ebook_downloads = EbookDownload.objects.all()
 
         def _counts(qs):
             return {
@@ -1303,14 +1360,17 @@ class StatsView(DashboardView, TemplateView):
             }
 
         # List of cards the template iterates. Tuple shape is fixed so
-        # it doesn't need any custom dict-access filters.
+        # it doesn't need any custom dict-access filters. Ebook downloads
+        # count alongside view events — same shape, different verb.
         v = _counts(video_views)
         r = _counts(reel_views)
         a = _counts(article_views)
+        e = _counts(ebook_downloads)
         ctx['totals_cards'] = [
             ('Videos', v['all'], v['d7'], v['d30']),
             ('Reels', r['all'], r['d7'], r['d30']),
             ('Articles', a['all'], a['d7'], a['d30']),
+            ('Ebook downloads', e['all'], e['d7'], e['d30']),
         ]
 
         # Unique users (signed-in only — guests are NULL in user_id).
@@ -1320,9 +1380,12 @@ class StatsView(DashboardView, TemplateView):
             +
             article_views.filter(created_at__gte=d30, user__isnull=False)
             .values('user_id').distinct().count()
+            +
+            ebook_downloads.filter(created_at__gte=d30, user__isnull=False)
+            .values('user_id').distinct().count()
         )
 
-        # Top videos / reels / articles by views in the last 30 days.
+        # Top videos / reels / articles / ebooks by activity in 30d.
         ctx['top_videos'] = self._top_videos(is_reel=False, since=d30)
         ctx['top_reels'] = self._top_videos(is_reel=True, since=d30)
         ctx['top_articles'] = list(
@@ -1334,12 +1397,25 @@ class StatsView(DashboardView, TemplateView):
             ).filter(view_count__gt=0).order_by('-view_count')[:10]
             .values('id', 'title', 'slug', 'view_count')
         )
+        ctx['top_ebooks'] = list(
+            Ebook.objects.annotate(
+                download_count_window=Count(
+                    'download_events',
+                    filter=Q(download_events__created_at__gte=d30),
+                ),
+            ).filter(download_count_window__gt=0)
+             .order_by('-download_count_window')[:10]
+             .values('id', 'title', 'slug', 'is_members_only',
+                     'download_count_window')
+        )
 
         # Sparkline data — one (label, json_string) tuple per type.
         ctx['daily_series'] = [
             ('Videos', json.dumps(self._daily_counts(video_views, d30, now))),
             ('Reels', json.dumps(self._daily_counts(reel_views, d30, now))),
             ('Articles', json.dumps(self._daily_counts(article_views, d30, now))),
+            ('Ebook downloads',
+             json.dumps(self._daily_counts(ebook_downloads, d30, now))),
         ]
 
         return ctx

@@ -10,6 +10,54 @@
   <a href="{% url 'dashboard:ebook-create' %}" class="btn btn-primary">+ New ebook</a>
 </div>
 
+<!-- Top-line download stats. 4 cards: total ebooks, all-time downloads,
+     last 30 days, last 7 days. Computed in EbookListView so the numbers
+     match what's visible in the per-ebook history. -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+  <div class="bg-white rounded-xl border border-stone-200 p-4">
+    <div class="text-xs uppercase text-stone-500 tracking-wide">Ebooks</div>
+    <div class="text-2xl font-semibold text-stone-900 mt-1">{{ stats.ebook_count }}</div>
+    <div class="text-xs text-stone-500 mt-0.5">
+      {{ stats.published_count }} published · {{ stats.members_only_count }} members-only
+    </div>
+  </div>
+  <div class="bg-white rounded-xl border border-stone-200 p-4">
+    <div class="text-xs uppercase text-stone-500 tracking-wide">Downloads</div>
+    <div class="text-2xl font-semibold text-stone-900 mt-1">{{ stats.downloads_all }}</div>
+    <div class="text-xs text-stone-500 mt-0.5">All time</div>
+  </div>
+  <div class="bg-white rounded-xl border border-stone-200 p-4">
+    <div class="text-xs uppercase text-stone-500 tracking-wide">Last 30 days</div>
+    <div class="text-2xl font-semibold text-stone-900 mt-1">{{ stats.downloads_d30 }}</div>
+    <div class="text-xs text-stone-500 mt-0.5">downloads</div>
+  </div>
+  <div class="bg-white rounded-xl border border-stone-200 p-4">
+    <div class="text-xs uppercase text-stone-500 tracking-wide">Last 7 days</div>
+    <div class="text-2xl font-semibold text-stone-900 mt-1">{{ stats.downloads_d7 }}</div>
+    <div class="text-xs text-stone-500 mt-0.5">downloads</div>
+  </div>
+</div>
+
+{% if top_ebooks %}
+<div class="bg-white rounded-xl border border-stone-200 p-5 mb-5">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-semibold text-stone-900 uppercase tracking-wide">Top 5 last 30 days</h2>
+    <span class="text-xs text-stone-500">By downloads in the window</span>
+  </div>
+  <ol class="space-y-2">
+    {% for e in top_ebooks %}
+    <li class="flex items-center justify-between">
+      <a href="{% url 'dashboard:ebook-edit' e.id %}" class="text-sm text-stone-800 hover:text-brand-600 truncate">
+        <span class="text-stone-400 mr-2">{{ forloop.counter }}.</span>{{ e.title }}
+        {% if e.is_members_only %}<span class="pill bg-amber-100 text-amber-700 ml-2 text-[10px]">Members</span>{% endif %}
+      </a>
+      <span class="text-sm font-medium text-stone-700">{{ e.window_downloads }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}
+
 <form method="get" class="mb-4">
   <input type="search" name="q" value="{{ q }}" placeholder="Search ebooks…" class="form-input max-w-sm">
 </form>

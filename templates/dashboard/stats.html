@@ -4,11 +4,11 @@
 {% block dashboard %}
 <div class="mb-6">
   <h1 class="font-display text-3xl text-stone-900">Stats</h1>
-  <p class="text-sm text-stone-500 mt-1">Views, completion, and drop-off across videos, reels, and articles.</p>
+  <p class="text-sm text-stone-500 mt-1">Views, completion, and drop-off across videos, reels, articles, and ebook downloads.</p>
 </div>
 
 <!-- Top-line cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
   {% for label, total_all, total_d7, total_d30 in totals_cards %}
   <div class="bg-white rounded-xl border border-stone-200 p-5">
     <div class="text-xs uppercase tracking-wider text-stone-500">{{ label }}</div>
@@ -37,7 +37,7 @@
 </div>
 
 <!-- 30-day daily-views chart (inline SVG sparkline) -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
   {% for series_label, daily_json in daily_series %}
   <div class="bg-white rounded-xl border border-stone-200 p-5">
     <div class="flex items-center justify-between mb-3">
@@ -131,7 +131,7 @@
   </div>
 
   <!-- Articles -->
-  <div class="bg-white rounded-xl border border-stone-200 overflow-hidden lg:col-span-2">
+  <div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
     <div class="px-5 py-4 border-b border-stone-200">
       <h2 class="font-display text-lg text-stone-900">Top articles (30d)</h2>
     </div>
@@ -156,6 +156,37 @@
     </table>
     {% else %}
     <div class="px-5 py-10 text-center text-stone-500 text-sm">No article opens yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Ebooks -->
+  <div class="bg-white rounded-xl border border-stone-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-stone-200">
+      <h2 class="font-display text-lg text-stone-900">Top ebooks (30d)</h2>
+      <p class="text-xs text-stone-500 mt-1">Each PDF open via the app's Library counts as one download.</p>
+    </div>
+    {% if top_ebooks %}
+    <table class="w-full text-sm">
+      <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+        <tr>
+          <th class="text-left px-4 py-2">Title</th>
+          <th class="text-right px-4 py-2">Downloads</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for e in top_ebooks %}
+        <tr>
+          <td class="px-4 py-2 font-medium text-stone-900">
+            <a href="{% url 'dashboard:ebook-edit' e.id %}" class="hover:text-brand-600">{{ e.title }}</a>
+            {% if e.is_members_only %}<span class="pill bg-amber-100 text-amber-700 ml-2 text-[10px]">Members</span>{% endif %}
+          </td>
+          <td class="px-4 py-2 text-right tabular-nums">{{ e.download_count_window }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="px-5 py-10 text-center text-stone-500 text-sm">No downloads yet.</div>
     {% endif %}
   </div>
 </div>
