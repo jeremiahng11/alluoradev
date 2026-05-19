@@ -40,5 +40,5 @@ COPY . /app
 
 # Whitenoise collects on boot via start.sh — same flow as the
 # previous Nixpacks setup, just inside a known-good container.
-EXPOSE 80
+EXPOSE ${PORT:-8000}
 CMD ["bash", "start.sh"]
