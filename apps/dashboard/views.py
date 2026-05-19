@@ -493,6 +493,78 @@ class AdminCreateView(DashboardView, View):
         return redirect('dashboard:admins')
 
 
+class ChangePasswordForm(forms.Form):
+    current_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'autocomplete': 'current-password',
+        }),
+    )
+    new_password = forms.CharField(
+        min_length=8,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'autocomplete': 'new-password',
+        }),
+        help_text='Min 8 characters.',
+    )
+    confirm_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'autocomplete': 'new-password',
+        }),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        new = cleaned.get('new_password')
+        confirm = cleaned.get('confirm_password')
+        if new and confirm and new != confirm:
+            self.add_error('confirm_password',
+                           'The two new-password fields don\'t match.')
+        return cleaned
+
+
+class ChangePasswordView(DashboardView, View):
+    """Self-service password change for the currently signed-in
+    dashboard admin. Requires the current password as proof — a
+    stolen session can't silently change the password to lock the
+    rightful owner out."""
+    template = 'dashboard/account_password.html'
+
+    def get(self, request):
+        return render(
+            request, self.template, {'form': ChangePasswordForm()},
+        )
+
+    def post(self, request):
+        form = ChangePasswordForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template, {'form': form})
+
+        user = request.user
+        # Re-authenticate using current password. authenticate() returns
+        # None on bad creds; we use the user's username (email login
+        # resolves to username earlier in LoginView).
+        check = authenticate(
+            request,
+            username=user.username,
+            password=form.cleaned_data['current_password'],
+        )
+        if check is None or check.pk != user.pk:
+            form.add_error('current_password', 'Current password is wrong.')
+            return render(request, self.template, {'form': form})
+
+        user.set_password(form.cleaned_data['new_password'])
+        user.save(update_fields=['password'])
+        # set_password() invalidates the session. Re-auth so the user
+        # isn't bounced to the login page after a successful change.
+        from django.contrib.auth import update_session_auth_hash
+        update_session_auth_hash(request, user)
+        messages.success(request, 'Password changed. Use the new one next time you sign in.')
+        return redirect('dashboard:account-password')
+
+
 class AdminRevokeView(DashboardView, View):
     """POST /dashboard/admins/<pk>/revoke/ — drops is_dashboard_admin
     on the target user. The user account itself stays (so any owned

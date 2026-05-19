@@ -81,6 +81,10 @@ urlpatterns = [
     path('admins/<int:pk>/revoke/', views.AdminRevokeView.as_view(),
          name='admin-revoke'),
 
+    # Self-service password change for the signed-in admin.
+    path('account/password/', views.ChangePasswordView.as_view(),
+         name='account-password'),
+
     # Skin AI tier rules now live inside the Settings page; only the
     # update POST handler remains as its own URL.
     path('skin-ai/settings/update/',

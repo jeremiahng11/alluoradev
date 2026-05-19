@@ -83,6 +83,10 @@
           <div class="truncate text-stone-200 text-xs">{{ request.user.email }}</div>
         </div>
       </div>
+      <a href="{% url 'dashboard:account-password' %}"
+         class="block px-3 py-2 text-sm text-stone-400 hover:bg-stone-800 hover:text-stone-200 rounded-md mt-1 {% if 'account/password' in request.path %}bg-stone-800 text-stone-200{% endif %}">
+        Change password
+      </a>
       <form method="post" action="{% url 'dashboard:logout' %}" class="mt-1">
         {% csrf_token %}
         <button type="submit" class="w-full text-left px-3 py-2 text-sm text-stone-400 hover:bg-stone-800 hover:text-stone-200 rounded-md">
