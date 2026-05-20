@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# Railway entrypoint. Runs on every deploy.
+# Deploy entrypoint. Runs on every container start. Platform-agnostic —
+# works on Railway, Render (Blueprint in render.yaml), Fly.io, or any
+# generic container host that injects $PORT and mounts a persistent
+# disk at /data.
 set -euo pipefail
 
-echo "==> Ensuring media dir exists (Railway volume mounts here)"
-# /data is the Railway volume mount; /data/media is MEDIA_ROOT in prod.
-# mkdir -p is a no-op if the volume already provides the directory.
+echo "==> Ensuring media dir exists (persistent disk mounts here)"
+# /data is the persistent disk mount (Railway volume / Render disk /
+# Fly volume). /data/media is MEDIA_ROOT in prod.  mkdir -p is a no-op
+# if the disk already provides the directory.
 mkdir -p /data/media || true
 
 echo "==> Collecting static files"

@@ -1,0 +1,66 @@
+# Render.com Blueprint — spins up the full Alluora backend stack
+# (Django web service + Postgres + persistent disk for /data/media).
+#
+# To deploy: Render dashboard → New → Blueprint → connect this repo.
+# Render reads this file, creates the database first, then the web
+# service, wiring DATABASE_URL automatically. Most env vars must be
+# filled in via the dashboard (the ones marked sync:false here) —
+# Render asks for them during Blueprint creation.
+#
+# Mirrors the Railway deploy contract: same Dockerfile, same start.sh
+# (which honors $PORT and mounts /data as the persistent volume).
+# Either platform can run unmodified app code.
+
+databases:
+  - name: alluora-db
+    plan: free          # bump to "basic-256mb" or higher for prod
+    databaseName: alluora
+    user: alluora
+
+services:
+  - type: web
+    name: alluora-admin
+    runtime: docker
+    plan: starter       # bump to "standard" for prod
+    region: singapore   # closest to alluora.rudratech.sg; change if needed
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /dashboard/login/
+    autoDeploy: true    # deploy on every push to the connected branch
+    disk:
+      name: media
+      mountPath: /data
+      sizeGB: 1         # bump as the ebook + skin AI thumbnail library grows
+    envVars:
+      # ---- Wired automatically by Render ----
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alluora-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true     # Render generates a strong random value
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: MEDIA_ROOT
+        value: /data/media
+      # ---- Set in the dashboard on first Blueprint creation ----
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_ADMIN_USERNAME
+        sync: false
+      - key: WORDPRESS_BASE_URL
+        sync: false
+      - key: ALLUORA_BRIDGE_SECRET
+        sync: false
+      - key: BUNNY_STREAM_LIBRARY_ID
+        sync: false
+      - key: BUNNY_STREAM_API_KEY
+        sync: false
+      - key: BUNNY_STREAM_CDN_HOSTNAME
+        sync: false
+      - key: BUNNY_STREAM_TOKEN_AUTH_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
