@@ -8,6 +8,9 @@ Only users with is_dashboard_admin=True can access. The bootstrap admin
 created by `manage.py create_admin` has this flag set automatically.
 """
 import logging
+import os
+import shutil
+import tempfile
 
 from django import forms
 from django.contrib import messages
@@ -491,6 +494,123 @@ class AdminCreateView(DashboardView, View):
             f'Added dashboard admin: {email}. They can sign in now.',
         )
         return redirect('dashboard:admins')
+
+
+class BackupDownloadView(DashboardView, View):
+    """GET /dashboard/settings/backup/ — generates a full-site backup
+    zip on demand and streams it to the browser. The zip contains
+    data.json (dumpdata) + media/ tree + manifest.json. Any signed-in
+    admin can download — backups are not destructive."""
+
+    def get(self, request):
+        from apps.dashboard import backup as backup_mod
+        from django.http import FileResponse
+        # Stage to a temp file (NOT NamedTemporaryFile — we want the
+        # file to outlive this block long enough for FileResponse to
+        # stream it; Django closes the handle after the response is
+        # sent).
+        tmp_dir = tempfile.mkdtemp(prefix='alluora-backup-')
+        ts = timezone.now().strftime('%Y%m%d-%H%M%S')
+        out_name = f'alluora-backup-{ts}.zip'
+        out_path = os.path.join(tmp_dir, out_name)
+        try:
+            backup_mod.create_backup_to(out_path)
+        except Exception as exc:
+            logger.exception('Backup generation failed')
+            messages.error(request, f'Backup failed: {exc}')
+            return redirect('dashboard:settings')
+
+        # FileResponse handles range requests + closes the handle. We
+        # also drop the temp dir after streaming via a wrapper.
+        response = FileResponse(
+            open(out_path, 'rb'),
+            as_attachment=True,
+            filename=out_name,
+            content_type='application/zip',
+        )
+        # Best-effort cleanup — schedule the temp dir to disappear after
+        # the response object is GC'd. Django's WSGI runner will close
+        # the file handle once the response is sent.
+        response._resource_closers.append(  # type: ignore[attr-defined]
+            lambda: shutil.rmtree(tmp_dir, ignore_errors=True),
+        )
+        return response
+
+
+class RestoreUploadForm(forms.Form):
+    """The restore confirmation form. The phrase is intentionally
+    annoying to type — restore wipes the database, you should NOT
+    be able to do it by accident."""
+    backup_file = forms.FileField(
+        widget=forms.ClearableFileInput(attrs={
+            'class': 'block w-full text-sm text-stone-700',
+            'accept': '.zip',
+        }),
+    )
+    confirm = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Type RESTORE here',
+            'autocomplete': 'off',
+        }),
+    )
+
+    def clean_confirm(self):
+        v = (self.cleaned_data.get('confirm') or '').strip().upper()
+        if v != 'RESTORE':
+            raise forms.ValidationError(
+                'Type RESTORE (uppercase) to confirm.'
+            )
+        return v
+
+
+class RestoreUploadView(DashboardView, View):
+    """POST /dashboard/settings/restore/ — wipes + reloads everything
+    from the uploaded zip. Main-admin only since this is irreversible
+    short of restoring an earlier backup."""
+
+    def post(self, request):
+        from apps.dashboard import backup as backup_mod
+        if not getattr(request.user, 'is_main_admin', False):
+            messages.error(
+                request,
+                'Restore is restricted to the main admin.',
+            )
+            return redirect('dashboard:settings')
+
+        form = RestoreUploadForm(request.POST, request.FILES)
+        if not form.is_valid():
+            for field, errors in form.errors.items():
+                for err in errors:
+                    messages.error(request, f'{field}: {err}')
+            return redirect('dashboard:settings')
+
+        upload = form.cleaned_data['backup_file']
+        try:
+            result = backup_mod.restore_from_zip(upload)
+        except backup_mod.BackupValidationError as exc:
+            messages.error(request, f'Invalid backup: {exc}')
+            return redirect('dashboard:settings')
+        except Exception as exc:
+            logger.exception('Restore failed')
+            messages.error(
+                request,
+                f'Restore failed: {exc}. The previous data may be '
+                f'partially overwritten — restore a known-good backup.',
+            )
+            return redirect('dashboard:settings')
+
+        manifest = result['manifest']
+        total_rows = sum(
+            v for v in manifest.get('model_counts', {}).values() if v > 0
+        )
+        messages.success(
+            request,
+            f'Restore complete. Loaded {total_rows} rows across '
+            f'{len(manifest.get("apps", []))} apps. '
+            f'Backup was created {manifest.get("created_at", "—")}.',
+        )
+        return redirect('dashboard:settings')
 
 
 class ChangePasswordForm(forms.Form):

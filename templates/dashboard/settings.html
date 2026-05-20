@@ -164,10 +164,91 @@
 </div>
 
 {# ─── API docs ────────────────────────────────────────────────── #}
-<div class="bg-white rounded-xl border border-stone-200 p-5 max-w-3xl">
+<div class="bg-white rounded-xl border border-stone-200 p-5 max-w-3xl mb-6">
   <h2 class="font-medium text-stone-900 mb-3">API documentation</h2>
   <p class="text-sm text-stone-600">Browse the live API schema:</p>
   <a href="/api/docs/" target="_blank" class="btn btn-ghost mt-2">Open Swagger UI →</a>
+</div>
+
+{# ─── Backup + Restore ────────────────────────────────────────── #}
+<div class="mb-8">
+  <h2 class="font-display text-xl text-stone-900 mb-3">Backup &amp; restore</h2>
+  <p class="text-xs text-stone-500 mb-3 max-w-3xl">
+    A backup is a single zip with every row from accounts, content,
+    videos, rewards, quiz, and skin AI &mdash; plus the entire media
+    folder (ebook PDFs, skin scan photos, article covers). Use it for
+    platform migrations (e.g. Railway &rarr; Render) and as an off-site
+    safety net before risky changes.
+  </p>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+
+    {# Backup card — every admin can download #}
+    <div class="bg-white rounded-xl border border-stone-200 p-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+          <svg class="w-5 h-5 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M4 12a8 8 0 1116 0 8 8 0 01-16 0z"/></svg>
+        </div>
+        <h3 class="font-medium text-stone-900">Download backup</h3>
+      </div>
+      <p class="text-sm text-stone-600 mb-4">
+        Streams a zip of the whole database + media folder. May take a
+        minute or two depending on the size of the media library &mdash;
+        keep this tab open while it downloads.
+      </p>
+      <a href="{% url 'dashboard:settings-backup' %}"
+         class="btn btn-primary inline-flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Download .zip
+      </a>
+    </div>
+
+    {# Restore card — main admin only, destructive #}
+    <div class="bg-white rounded-xl border border-stone-200 p-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+          <svg class="w-5 h-5 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </div>
+        <h3 class="font-medium text-stone-900">Restore from backup</h3>
+        {% if not request.user.is_main_admin %}
+          <span class="pill bg-stone-100 text-stone-600 ml-auto text-[10px]">Main admin only</span>
+        {% endif %}
+      </div>
+
+      {% if request.user.is_main_admin %}
+      <p class="text-sm text-red-700 mb-3">
+        <strong>Destructive.</strong> Every row in the listed apps is
+        wiped and replaced with what's in the zip; the entire media
+        folder is also replaced. Download a fresh backup first.
+      </p>
+      <form method="post" action="{% url 'dashboard:settings-restore' %}"
+            enctype="multipart/form-data" class="space-y-3">
+        {% csrf_token %}
+        <div>
+          <label class="block text-xs uppercase tracking-wider text-stone-500 mb-1">Backup file (.zip)</label>
+          <input type="file" name="backup_file" accept=".zip" required
+                 class="block w-full text-sm text-stone-700">
+        </div>
+        <div>
+          <label class="block text-xs uppercase tracking-wider text-stone-500 mb-1">Type <code class="text-red-700">RESTORE</code> to confirm</label>
+          <input type="text" name="confirm" placeholder="RESTORE" required autocomplete="off"
+                 class="form-input">
+        </div>
+        <button type="submit"
+                onclick="return confirm('This will overwrite the entire database and media folder. Continue?');"
+                class="btn inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white">
+          Restore from .zip
+        </button>
+      </form>
+      {% else %}
+      <p class="text-sm text-stone-600">
+        Restoring overwrites the whole platform's data. Only the main
+        admin can run it &mdash; ask them if you need to roll back.
+      </p>
+      {% endif %}
+    </div>
+
+  </div>
 </div>
 
 {# Alpine for the unlimited-free checkbox interactivity in the Skin AI section. #}

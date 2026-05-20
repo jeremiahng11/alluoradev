@@ -85,6 +85,14 @@ urlpatterns = [
     path('account/password/', views.ChangePasswordView.as_view(),
          name='account-password'),
 
+    # Full-site backup + restore (lives under Settings page).
+    # Backup: any admin can download. Restore: main admin only,
+    # gated server-side and behind a typed confirmation phrase.
+    path('settings/backup/', views.BackupDownloadView.as_view(),
+         name='settings-backup'),
+    path('settings/restore/', views.RestoreUploadView.as_view(),
+         name='settings-restore'),
+
     # Skin AI tier rules now live inside the Settings page; only the
     # update POST handler remains as its own URL.
     path('skin-ai/settings/update/',
