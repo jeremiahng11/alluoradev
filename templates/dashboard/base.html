@@ -5,6 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Alluora Dashboard{% endblock %}</title>
 
+  <!-- PWA: lets the dashboard be installed as a standalone desktop /
+       mobile app via Chrome's install button or Safari's "Add to Home
+       Screen". The manifest + icons are generated server-side by
+       apps/dashboard/pwa.py — no build step needed. -->
+  <link rel="manifest" href="{% url 'dashboard:pwa-manifest' %}">
+  <meta name="theme-color" content="#DD5430">
+  <meta name="application-name" content="Alluora Admin">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Alluora Admin">
+  <link rel="apple-touch-icon" sizes="192x192" href="{% url 'dashboard:pwa-icon' size=192 %}">
+  <link rel="apple-touch-icon" sizes="512x512" href="{% url 'dashboard:pwa-icon' size=512 %}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{% url 'dashboard:pwa-icon' size=192 %}">
+  <link rel="icon" type="image/png" sizes="48x48" href="{% url 'dashboard:pwa-icon' size=48 %}">
+
   <!-- Tailwind via CDN — fine for small admin dashboards. For larger ones,
        compile via npm; the CDN is rate-limited and not recommended for prod
        customer pages. -->
@@ -68,5 +83,23 @@
 </head>
 <body class="min-h-screen">
 {% block content %}{% endblock %}
+
+<!-- PWA service worker registration. The SW is served from
+     /dashboard/sw.js so its default scope is /dashboard/ — controls
+     the whole admin app, doesn't bleed into /api/ or the public root
+     redirect. Registration is fire-and-forget; a failure (SW
+     disabled by the user, browser doesn't support it, page served
+     over HTTP in dev) shouldn't break the page. -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('{% url "dashboard:pwa-sw" %}', {
+      scope: '/dashboard/',
+    }).catch((err) => {
+      console.warn('[pwa] SW registration failed:', err);
+    });
+  });
+}
+</script>
 </body>
 </html>

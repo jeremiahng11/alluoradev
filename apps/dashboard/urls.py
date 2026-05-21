@@ -1,9 +1,15 @@
 from django.urls import path
-from . import views
+from . import views, pwa
 
 app_name = 'dashboard'
 
 urlpatterns = [
+    # PWA endpoints — top of the urlpatterns so the SW URL resolves
+    # cleanly even before any auth gate. None of these expose data.
+    path('manifest.webmanifest', pwa.manifest_view, name='pwa-manifest'),
+    path('sw.js', pwa.service_worker_view, name='pwa-sw'),
+    path('pwa/icon-<int:size>.png', pwa.icon_view, name='pwa-icon'),
+
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('', views.HomeView.as_view(), name='home'),
