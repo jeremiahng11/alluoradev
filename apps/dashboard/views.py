@@ -604,6 +604,44 @@ class RestoreUploadView(DashboardView, View):
         total_rows = sum(
             v for v in manifest.get('model_counts', {}).values() if v > 0
         )
+
+        # Rebind the admin's session to whatever AppUser row matches
+        # their email AFTER the restore. The flush+loaddata may have
+        # changed their PK (cross-environment backup) — without this
+        # rebind, the session cookie still references the old PK and
+        # the next request bounces them to /login/ with no
+        # explanation. login() also refreshes the session hash so any
+        # password change embedded in the restore doesn't trip
+        # Django's "password changed elsewhere" invalidation.
+        prior_email = request.user.email if request.user.is_authenticated else None
+        try:
+            if prior_email:
+                rebind_target = User.objects.filter(
+                    email__iexact=prior_email,
+                    is_dashboard_admin=True,
+                ).first()
+                if rebind_target:
+                    # auth backend label is required since the user's
+                    # backend may not be set after the flush.
+                    rebind_target.backend = (
+                        'django.contrib.auth.backends.ModelBackend'
+                    )
+                    login(request, rebind_target)
+                else:
+                    # Their admin row didn't survive the restore — log
+                    # them out cleanly with a message rather than
+                    # leaving them in a half-authenticated state.
+                    logout(request)
+                    messages.warning(
+                        request,
+                        f'Restore complete, but {prior_email} is not a '
+                        f'dashboard admin in the restored data. '
+                        f'Sign in with an admin account from the backup.',
+                    )
+                    return redirect('dashboard:login')
+        except Exception:
+            logger.exception('Post-restore session rebind failed')
+
         messages.success(
             request,
             f'Restore complete. Loaded {total_rows} rows across '

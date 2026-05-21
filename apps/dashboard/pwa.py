@@ -171,7 +171,7 @@ def _render_icon(size: int) -> bytes:
 
 # Bumped whenever the SW logic changes — clients with a different
 # cache name will tear down old caches on next activate.
-SW_CACHE_VERSION = 'alluora-dashboard-v1'
+SW_CACHE_VERSION = 'alluora-dashboard-v2'
 
 # Inline SW source as a Python string. Kept here rather than as a
 # static file so it can interpolate the cache version + scope without
@@ -195,8 +195,26 @@ const CACHE = '%(cache_version)s';
 const APP_SHELL = '/dashboard/';
 
 self.addEventListener('install', (event) => {
+  // Don't blindly cache.add(APP_SHELL) — when a logged-out browser
+  // is registering the SW, `/dashboard/` returns a 302 to /login/
+  // and Cache.add() would happily store the login page under the
+  // dashboard-shell key. Then logged-in users would briefly see
+  // the login HTML when offline (network-first paths over it on
+  // every online visit, but it's still wrong).
+  //
+  // redirect: 'manual' makes the fetch return an opaqueredirect
+  // (res.ok === false) on a 302, so we skip the put. On a real
+  // 200 (signed-in user opening the dashboard), we cache as
+  // intended. The fetch handler picks up the slack on later
+  // visits to populate the shell organically.
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.add(APP_SHELL))
+    fetch(APP_SHELL, { redirect: 'manual' })
+      .then((res) => {
+        if (res && res.ok && res.type === 'basic') {
+          return caches.open(CACHE).then((c) => c.put(APP_SHELL, res));
+        }
+      })
+      .catch(() => {})  // offline at install time — that's fine
       .then(() => self.skipWaiting())
   );
 });
