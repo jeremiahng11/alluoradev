@@ -100,6 +100,125 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+
+// ─── Install button controller ─────────────────────────────────
+// Wires #pwa-install-btn (rendered in _layout.html) so the user can
+// install the dashboard as a standalone app on demand instead of
+// waiting for Chrome's own install heuristic to surface its toolbar
+// icon.
+//
+//   Chromium (Chrome / Edge / Brave / Opera) — listens for the
+//     beforeinstallprompt event, stashes it, shows the button, and
+//     fires .prompt() on click.
+//   Safari (macOS / iOS) — never fires beforeinstallprompt; we
+//     detect it via UA and surface an instructions overlay (no
+//     programmatic install exists on these browsers).
+//   Already installed (display-mode: standalone) — hide the button.
+//   Firefox desktop — no install support; button stays hidden.
+(function () {
+  const btn = document.getElementById('pwa-install-btn');
+  const helpModal = document.getElementById('pwa-install-help');
+  const helpClose = document.getElementById('pwa-install-help-close');
+  const helpBody = document.querySelector('[data-pwa-help-body]');
+  if (!btn) return;
+
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  if (isStandalone) {
+    // Already installed and running in its own window — nothing to do.
+    return;
+  }
+
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isSafariDesktop = /^((?!chrome|android).)*safari/i.test(ua)
+    && /Macintosh/.test(ua);
+
+  let deferredPrompt = null;
+
+  function showBtn() {
+    btn.classList.remove('hidden');
+    btn.classList.add('flex');
+  }
+
+  function hideBtn() {
+    btn.classList.remove('flex');
+    btn.classList.add('hidden');
+  }
+
+  function showHelp(text) {
+    if (!helpModal || !helpBody) return;
+    helpBody.textContent = text;
+    helpModal.classList.remove('hidden');
+  }
+
+  if (helpClose) {
+    helpClose.addEventListener('click', () => {
+      helpModal.classList.add('hidden');
+    });
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) helpModal.classList.add('hidden');
+    });
+  }
+
+  // Chromium path.
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showBtn();
+  });
+
+  // If beforeinstallprompt never fires (Safari / iOS / Firefox) but
+  // we still want a way for the user to discover the install path,
+  // surface the button anyway and route it to instructions.
+  if (isIOS || isSafariDesktop) {
+    showBtn();
+  }
+
+  // Hide the button once the app is installed; the next launch
+  // will run in standalone mode and the early return above kicks in.
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    hideBtn();
+  });
+
+  btn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log('[pwa] install', outcome);
+      } catch (err) {
+        console.warn('[pwa] prompt failed:', err);
+      }
+      deferredPrompt = null;
+      hideBtn();
+      return;
+    }
+    if (isIOS) {
+      showHelp(
+        'In Safari, tap the Share button (square with an up arrow), '
+        + 'scroll down and choose “Add to Home Screen”. The dashboard '
+        + 'will launch from your home screen like any other app.'
+      );
+      return;
+    }
+    if (isSafariDesktop) {
+      showHelp(
+        'In Safari, open the File menu and choose “Add to Dock”. '
+        + 'The dashboard will launch in its own window from your Dock.'
+      );
+      return;
+    }
+    // Fallback for browsers that never fire beforeinstallprompt
+    // (older Firefox, etc).
+    showHelp(
+      'Your browser doesn’t expose a one-click install. Try Chrome '
+      + 'or Edge, or look for an “Install” / “Add to Home Screen” '
+      + 'option in your browser’s menu.'
+    );
+  });
+})();
 </script>
 </body>
 </html>

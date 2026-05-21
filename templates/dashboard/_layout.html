@@ -83,6 +83,19 @@
           <div class="truncate text-stone-200 text-xs">{{ request.user.email }}</div>
         </div>
       </div>
+      <!-- Install-as-app button. Hidden by default; revealed by the
+           PWA install controller (script at the bottom of base.html)
+           when the browser fires beforeinstallprompt. Safari + iOS
+           users see the same button but it opens an instructions
+           overlay since those browsers don't expose a programmatic
+           install API. -->
+      <button id="pwa-install-btn" type="button"
+              data-state="hidden"
+              class="hidden w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-stone-800 hover:text-amber-200 rounded-md mt-1 items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        <span data-pwa-label>Install app</span>
+      </button>
+
       <a href="{% url 'dashboard:account-password' %}"
          class="block px-3 py-2 text-sm text-stone-400 hover:bg-stone-800 hover:text-stone-200 rounded-md mt-1 {% if 'account/password' in request.path %}bg-stone-800 text-stone-200{% endif %}">
         Change password
@@ -95,6 +108,20 @@
       </form>
     </div>
   </aside>
+
+  <!-- Safari / iOS install-instructions overlay. Pure CSS modal; the
+       install controller below decides when (if ever) to show it. -->
+  <div id="pwa-install-help"
+       class="hidden fixed inset-0 z-50 bg-stone-900/60 flex items-center justify-center p-6">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+      <h2 class="font-display text-2xl text-stone-900 mb-2">Install Alluora Admin</h2>
+      <p class="text-sm text-stone-600 mb-4" data-pwa-help-body></p>
+      <div class="flex justify-end">
+        <button type="button" id="pwa-install-help-close"
+                class="btn btn-primary">Got it</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Main column -->
   <main class="flex-1 min-w-0">
