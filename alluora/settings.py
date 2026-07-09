@@ -176,7 +176,7 @@ BOOTSTRAP_ADMIN_USERNAME = config('BOOTSTRAP_ADMIN_USERNAME', default='admin')
 # ---------------------------------------------------------------------------
 # WordPress integration
 # ---------------------------------------------------------------------------
-WORDPRESS_BASE_URL = config('WORDPRESS_BASE_URL', default='https://staging.alluora.com')
+WORDPRESS_BASE_URL = config('WORDPRESS_BASE_URL', default='https://alluora.com')
 WORDPRESS_API_NAMESPACE = 'alluora/v1'
 
 # HMAC shared secret for service-to-service /sync/* calls into the bridge
